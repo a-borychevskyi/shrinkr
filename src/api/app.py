@@ -10,7 +10,7 @@ from src.di.orm.database import get_db
 async def lifespan(app: FastAPI):
     app.state.db = get_db()
     yield
-    app.state.db.stop()
+    await app.state.db.stop()
 
 
 def create_app() -> FastAPI:

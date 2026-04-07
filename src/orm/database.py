@@ -23,5 +23,5 @@ class Database:
             scopefunc=current_task,
         )
 
-    def stop(self):
-        self.async_engine.dispose()
+    async def stop(self):
+        await self.async_engine.dispose()

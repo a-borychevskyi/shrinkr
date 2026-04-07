@@ -57,7 +57,7 @@ async def deactivate_short_url(
         MarkAsDeletedUrlHandler, Depends(mark_as_deleted_url_handler)
     ],
 ) -> BasePayloadResponse[DeactivateUrlResponse]:
-    response = await mark_as_deleted_handler.handle(body.url_id)
+    response = await mark_as_deleted_handler.handle(body.short_code)
 
     message = "Short URL deactivated"
     if response is None:

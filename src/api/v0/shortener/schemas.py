@@ -1,4 +1,4 @@
-from pydantic import Field
+from pydantic import Field, HttpUrl
 
 from src.api.base import BaseRequest, BaseResponse
 
@@ -34,7 +34,7 @@ class ActivateUrlResponse(BaseResponse):
 
 
 class CreateShortUrlRequest(BaseRequest):
-    target_url: str = Field(..., description="The target URL to shorten")
+    target_url: HttpUrl = Field(..., description="The target URL to shorten")
 
 
 class CreateShortUrlResponse(BaseResponse):

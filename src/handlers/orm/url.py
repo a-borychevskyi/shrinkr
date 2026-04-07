@@ -16,8 +16,6 @@ class GetOneUrlHandler:
     async def handle(self, filters: FilterModelT):
         async with self.uow as uow:
             session = uow.session
-            if not session:
-                raise Exception("Session is not opened")
 
             return await self.url_repository.get_one(
                 filters=filters, async_session=session
@@ -32,8 +30,6 @@ class GetListUrlHandler:
     async def handle(self, filters: FilterModelT):
         async with self.uow as uow:
             session = uow.session
-            if not session:
-                raise Exception("Session is not opened")
 
             return await self.url_repository.get_list(
                 filters=filters, async_session=session
@@ -48,8 +44,6 @@ class GetAllUrlHandler:
     async def handle(self):
         async with self.uow as uow:
             session = uow.session
-            if not session:
-                raise Exception("Session is not opened")
 
             return await self.url_repository.get_all(async_session=session)
 
@@ -66,8 +60,6 @@ class CreateUrlHandler:
     async def handle(self, model):
         async with self.uow as uow:
             session = uow.session
-            if not session:
-                raise Exception("Session is not opened")
 
             model_to_create = UrlModel(
                 id=None,
@@ -91,8 +83,6 @@ class CreateListUrlHandler:
     async def handle(self, models):
         async with self.uow as uow:
             session = uow.session
-            if not session:
-                raise Exception("Session is not opened")
 
             return await self.url_repository.create_list(
                 models=models, async_session=session
@@ -107,8 +97,6 @@ class UpdateUrlHandler:
     async def handle(self, model):
         async with self.uow as uow:
             session = uow.session
-            if not session:
-                raise Exception("Session is not opened")
 
             return await self.url_repository.update_one(
                 model=model, async_session=session
@@ -123,8 +111,6 @@ class UpdateListUrlHandler:
     async def handle(self, models):
         async with self.uow as uow:
             session = uow.session
-            if not session:
-                raise Exception("Session is not opened")
 
             return await self.url_repository.update_list(
                 models=models, async_session=session
@@ -136,12 +122,11 @@ class MarkAsDeletedUrlHandler:
         self.url_repository = url_repository
         self.uow = uow
 
-    async def handle(self, url_id: int):
+    async def handle(self, short_code: str):
         async with self.uow as uow:
             session = uow.session
-            if not session:
-                raise Exception("Session is not opened")
-            filters = UrlFilter(id=url_id)
+
+            filters = UrlFilter(short_code=short_code)
             model = await self.url_repository.get_one(
                 filters=filters, async_session=session
             )
@@ -162,8 +147,6 @@ class DeleteUrlHandler:
     async def handle(self, model):
         async with self.uow as uow:
             session = uow.session
-            if not session:
-                raise Exception("Session is not opened")
 
             return await self.url_repository.delete_one(
                 model=model, async_session=session

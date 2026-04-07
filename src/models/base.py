@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Annotated
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 
 class BaseEntityModel(BaseModel):
@@ -14,6 +14,8 @@ class ManyCustomResponse[T](BaseEntityModel):
 
 
 class PydanticOrmModel(BaseEntityModel, ABC):
+    model_config = ConfigDict(from_attributes=True)
+
     @abstractmethod
     def to_orm(self):
         raise NotImplementedError
