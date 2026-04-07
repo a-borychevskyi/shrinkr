@@ -37,7 +37,7 @@ class GetListUrlHandler:
         self.uow = uow
 
     async def handle(
-            self, filters: UrlFilter, sorters: UrlSortModel
+        self, filters: UrlFilter, sorters: UrlSortModel
     ) -> ManyCustomResponse[UrlModel]:
         async with self.uow as uow:
             session = uow.session

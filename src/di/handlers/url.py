@@ -2,7 +2,7 @@ from typing import Annotated
 
 from fastapi import Depends
 
-from handlers.orm.url import MarkAsActiveUrlHandler
+from src.handlers.orm.url import MarkAsActiveUrlHandler
 from src.di.orm.database import get_uow
 from src.di.repositories.url import get_url_repository
 from src.handlers.orm.url import (

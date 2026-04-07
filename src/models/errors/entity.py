@@ -2,10 +2,14 @@ from typing import Annotated
 
 from pydantic import Field
 
+from pydantic import ConfigDict
+
 from src.models.base import BaseEntityModel
 
 
 class ErrorModel(BaseEntityModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     error_class: Annotated[
         str | None,
         Field(description="Error class name", alias="errorClass"),

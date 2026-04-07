@@ -4,11 +4,8 @@ from fastapi import APIRouter, Query, Request
 from fastapi.params import Depends
 from fastapi.responses import RedirectResponse
 
-from handlers.orm.url import UpdateUrlHandler, MarkAsActiveUrlHandler
-from handlers.orm.url_stats import GetListUrlStatsHandler
-from orm.sorters.url_stats import UrlStatsSortModel
 from src.api.base import BasePayloadResponse
-from src.api.v0.shortener.schemas import (
+from src.api.v0.shortener.url.schemas import (
     ActivateUrlRequest,
     ActivateUrlResponse,
     CreateShortUrlRequest,
@@ -17,8 +14,6 @@ from src.api.v0.shortener.schemas import (
     DeactivateUrlResponse,
     DeleteUrlRequest,
     DeleteUrlResponse,
-    GetShortUrlStatsRequest,
-    GetShortUrlStatsResponse,
     RedirectToUrlRequest,
 )
 from src.di.handlers.url import (
@@ -30,7 +25,6 @@ from src.di.handlers.url import (
 )
 from src.di.handlers.url_stats import (
     create_url_stats_handler,
-    get_list_url_stats_handler,
 )
 from src.handlers.orm.url import (
     CreateUrlHandler,
@@ -42,7 +36,7 @@ from src.handlers.orm.url import (
 from src.handlers.orm.url_stats import CreateUrlStatsHandler
 from src.orm.filters.url import UrlFilter
 
-router = APIRouter(prefix="/shortner", tags=["shortener"])
+router = APIRouter(prefix="/shortner", tags=["Urls"])
 
 
 @router.get(
@@ -72,28 +66,6 @@ async def redirect_to_url(
         ip_address=ip_address,
     )
     return RedirectResponse(url=response.target_url, status_code=302)
-
-
-@router.get(
-    "/stats", response_model=BasePayloadResponse[list[GetShortUrlStatsResponse]]
-)
-async def get_short_url_stats(
-    query_params: Annotated[GetShortUrlStatsRequest, Query()],
-    get_list_handler: Annotated[
-        GetListUrlStatsHandler, Depends(get_list_url_stats_handler)
-    ],
-) -> BasePayloadResponse[GetShortUrlStatsResponse]:
-    filters = UrlFilter(short_code=query_params.short_code)
-    response = await get_list_handler.handle(
-        filters,
-        sorters=UrlStatsSortModel(access_time="ASC"),
-    )
-    return BasePayloadResponse(
-        payload=[
-            GetShortUrlStatsResponse.model_validate(model) for model in response.data
-        ],
-        status_code=200,
-    )
 
 
 @router.post("/deactivate", response_model=BasePayloadResponse[DeactivateUrlResponse])

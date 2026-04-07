@@ -1,7 +1,7 @@
 from loguru import logger
 
-from orm.filters.url import UrlFilter
-from repositories.url import UrlRepository
+from src.orm.filters.url import UrlFilter
+from src.repositories.url import UrlRepository
 from src.models.base import ManyCustomResponse
 from src.models.url_stats.entity import UrlStatsModel
 from src.orm.filters.url_stats import UrlStatsFilter

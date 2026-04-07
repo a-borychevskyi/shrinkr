@@ -2,8 +2,8 @@ from typing import Annotated
 
 from fastapi import Depends
 
-from di.repositories.url_stats import get_url_stats_repository
-from handlers.orm.url_stats import (
+from src.di.repositories.url_stats import get_url_stats_repository
+from src.handlers.orm.url_stats import (
     CreateListUrlStatsHandler,
     CreateUrlStatsHandler,
     DeleteUrlStatsHandler,
