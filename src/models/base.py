@@ -5,7 +5,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class BaseEntityModel(BaseModel):
-    pass
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class ManyCustomResponse[T](BaseEntityModel):

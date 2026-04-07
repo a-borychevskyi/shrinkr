@@ -32,5 +32,4 @@ class UrlStatsSortModel(BaseSortModel):
     url_id: Annotated[SortOption | None, Field()] = None
     user_agent: Annotated[SortOption | None, Field()] = None
     ip_address: Annotated[SortOption | None, Field()] = None
-    redirect_elapsed_ms: Annotated[SortOption | None, Field()] = None
     access_time: Annotated[SortOption | None, Field()] = None

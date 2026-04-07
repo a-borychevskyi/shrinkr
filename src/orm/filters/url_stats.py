@@ -42,13 +42,6 @@ class UrlStatsFilter(BaseFilterModel):
         str | None, Query(filter_by=lambda value: UrlStats.ip_address.contains(value))
     ] = Field(default=None)
 
-    redirect_elapsed_ms__gt: Annotated[
-        int | None, Query(filter_by=lambda value: UrlStats.redirect_elapsed_ms > value)
-    ] = Field(default=None)
-    redirect_elapsed_ms__lt: Annotated[
-        int | None, Query(filter_by=lambda value: UrlStats.redirect_elapsed_ms < value)
-    ] = Field(default=None)
-
     access_time: Annotated[
         datetime | None, Query(filter_by=lambda value: UrlStats.access_time == value)
     ] = Field(default=None)

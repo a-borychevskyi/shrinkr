@@ -16,25 +16,11 @@ from src.api.v0.shortener.url.schemas import (
     DeleteUrlResponse,
     RedirectToUrlRequest,
 )
-from src.di.handlers.url import (
-    create_url_handler,
-    get_one_url_handler,
-    mark_as_deleted_url_handler,
-    mark_as_active_url_handler,
-    delete_url_handler,
-)
-from src.di.handlers.url_stats import (
-    create_url_stats_handler,
-)
-from src.handlers.orm.url import (
-    CreateUrlHandler,
-    GetOneUrlHandler,
-    MarkAsDeletedUrlHandler,
-    MarkAsActiveUrlHandler,
-    DeleteUrlHandler,
-)
-from src.handlers.orm.url_stats import CreateUrlStatsHandler
+from src.di.services.url import get_url_service
+from src.di.services.url_stats import get_url_stats_service
 from src.orm.filters.url import UrlFilter
+from src.services.database.url import UrlService
+from src.services.database.url_stats import UrlStatsService
 
 router = APIRouter(prefix="/shortner", tags=["Urls"])
 
@@ -47,20 +33,18 @@ router = APIRouter(prefix="/shortner", tags=["Urls"])
 async def redirect_to_url(
     request: Request,
     query_params: Annotated[RedirectToUrlRequest, Query()],
-    get_one_handler: Annotated[GetOneUrlHandler, Depends(get_one_url_handler)],
-    create_stats_handler: Annotated[
-        CreateUrlStatsHandler, Depends(create_url_stats_handler)
-    ],
+    url_service: Annotated[UrlService, Depends(get_url_service)],
+    url_stats_service: Annotated[UrlStatsService, Depends(get_url_stats_service)],
 ) -> RedirectResponse:
     filters = UrlFilter(short_code=query_params.short_code)
-    response = await get_one_handler.handle(filters)
+    response = await url_service.get_one(filters)
     if response is None:
         return RedirectResponse(url="/", status_code=302)
 
     _id = response.id if response.id is not None else -1
     ip_address = request.client.host if request.client is not None else "unknown"
     user_agent = request.headers.get("user-agent", "unknown")
-    await create_stats_handler.handle(
+    await url_stats_service.create(
         url_id=_id,
         user_agent=user_agent,
         ip_address=ip_address,
@@ -71,11 +55,9 @@ async def redirect_to_url(
 @router.post("/deactivate", response_model=BasePayloadResponse[DeactivateUrlResponse])
 async def deactivate_short_url(
     body: DeactivateUrlRequest,
-    mark_as_deleted_handler: Annotated[
-        MarkAsDeletedUrlHandler, Depends(mark_as_deleted_url_handler)
-    ],
+    url_service: Annotated[UrlService, Depends(get_url_service)],
 ) -> BasePayloadResponse[DeactivateUrlResponse]:
-    response = await mark_as_deleted_handler.handle(body.short_code)
+    response = await url_service.mark_as_deleted(body.short_code)
 
     message = "Short URL deactivated"
     status_code = 200
@@ -91,11 +73,9 @@ async def deactivate_short_url(
 @router.post("/activate", response_model=BasePayloadResponse[ActivateUrlResponse])
 async def activate_short_url(
     body: ActivateUrlRequest,
-    mark_as_active_handler: Annotated[
-        MarkAsActiveUrlHandler, Depends(mark_as_active_url_handler)
-    ],
+    url_service: Annotated[UrlService, Depends(get_url_service)],
 ) -> BasePayloadResponse[ActivateUrlResponse]:
-    response = await mark_as_active_handler.handle(body.short_code)
+    response = await url_service.mark_as_active(body.short_code)
 
     message = "Short URL activated"
     status_code = 200
@@ -111,9 +91,9 @@ async def activate_short_url(
 @router.post("/", response_model=BasePayloadResponse[CreateShortUrlResponse])
 async def create_short_url(
     body: CreateShortUrlRequest,
-    create_handler: Annotated[CreateUrlHandler, Depends(create_url_handler)],
+    url_service: Annotated[UrlService, Depends(get_url_service)],
 ) -> BasePayloadResponse[CreateShortUrlResponse]:
-    response = await create_handler.handle(str(body.target_url))
+    response = await url_service.create(str(body.target_url))
     return BasePayloadResponse(
         payload=CreateShortUrlResponse(short_code=response.short_code),
         status_code=201,
@@ -123,9 +103,9 @@ async def create_short_url(
 @router.delete("/{short_code}", response_model=BasePayloadResponse[DeleteUrlResponse])
 async def delete_short_url(
     query_params: Annotated[DeleteUrlRequest, Query()],
-    delete_handler: Annotated[DeleteUrlHandler, Depends(delete_url_handler)],
+    url_service: Annotated[UrlService, Depends(get_url_service)],
 ) -> BasePayloadResponse[DeleteUrlResponse]:
-    await delete_handler.handle(query_params.short_code)
+    await url_service.delete(query_params.short_code)
     return BasePayloadResponse(
         payload=DeleteUrlResponse(message="Short URL deleted"), status_code=200
     )

@@ -1,121 +1,20 @@
 from unittest.mock import MagicMock
 
-from src.di.handlers.url import (
-    create_list_url_handler,
-    get_all_url_handler,
-    get_list_url_handler,
-    mark_as_active_url_handler,
-    mark_as_deleted_url_handler,
-    update_list_url_handler,
-    update_url_handler,
-    delete_url_handler,
-)
-from src.di.handlers.url_stats import (
-    get_one_url_stats_handler,
-    get_all_url_stats_handler,
-    create_url_stats_handler,
-    create_list_url_stats_handler,
-    update_url_stats_handler,
-    update_list_url_stats_handler,
-    delete_url_stats_handler,
-)
-from src.handlers.orm.url import (
-    CreateListUrlHandler,
-    DeleteUrlHandler,
-    GetAllUrlHandler,
-    GetListUrlHandler,
-    MarkAsActiveUrlHandler,
-    MarkAsDeletedUrlHandler,
-    UpdateListUrlHandler,
-    UpdateUrlHandler,
-)
-from src.handlers.orm.url_stats import (
-    CreateListUrlStatsHandler,
-    CreateUrlStatsHandler,
-    DeleteUrlStatsHandler,
-    GetAllUrlStatsHandler,
-    GetOneUrlStatsHandler,
-    UpdateListUrlStatsHandler,
-    UpdateUrlStatsHandler,
-)
-from src.repositories.url import UrlRepository
+from src.di.services.url import get_url_service
+from src.di.services.url_stats import get_url_stats_service
+from src.services.database.url import UrlService
+from src.services.database.url_stats import UrlStatsService
 
 
-class TestUrlDiFactories:
-    def test_get_list_url_handler(self):
+class TestUrlServiceFactory:
+    def test_returns_url_service(self):
         uow = MagicMock()
-        handler = get_list_url_handler(uow)
-        assert isinstance(handler, GetListUrlHandler)
+        service = get_url_service(uow)
+        assert isinstance(service, UrlService)
 
-    def test_get_all_url_handler(self):
+
+class TestUrlStatsServiceFactory:
+    def test_returns_url_stats_service(self):
         uow = MagicMock()
-        handler = get_all_url_handler(uow)
-        assert isinstance(handler, GetAllUrlHandler)
-
-    def test_create_list_url_handler(self):
-        uow = MagicMock()
-        handler = create_list_url_handler(uow)
-        assert isinstance(handler, CreateListUrlHandler)
-
-    def test_update_url_handler(self):
-        uow = MagicMock()
-        handler = update_url_handler(uow)
-        assert isinstance(handler, UpdateUrlHandler)
-
-    def test_update_list_url_handler(self):
-        uow = MagicMock()
-        handler = update_list_url_handler(uow)
-        assert isinstance(handler, UpdateListUrlHandler)
-
-    def test_mark_as_active_url_handler(self):
-        uow = MagicMock()
-        handler = mark_as_active_url_handler(uow)
-        assert isinstance(handler, MarkAsActiveUrlHandler)
-
-    def test_mark_as_deleted_url_handler(self):
-        uow = MagicMock()
-        handler = mark_as_deleted_url_handler(uow)
-        assert isinstance(handler, MarkAsDeletedUrlHandler)
-
-    def test_delete_url_handler(self):
-        uow = MagicMock()
-        handler = delete_url_handler(uow)
-        assert isinstance(handler, DeleteUrlHandler)
-
-
-class TestUrlStatsDiFactories:
-    def test_get_one_url_stats_handler(self):
-        uow = MagicMock()
-        url_repo = UrlRepository()
-        handler = get_one_url_stats_handler(uow, url_repo)
-        assert isinstance(handler, GetOneUrlStatsHandler)
-
-    def test_get_all_url_stats_handler(self):
-        uow = MagicMock()
-        handler = get_all_url_stats_handler(uow)
-        assert isinstance(handler, GetAllUrlStatsHandler)
-
-    def test_create_url_stats_handler(self):
-        uow = MagicMock()
-        handler = create_url_stats_handler(uow)
-        assert isinstance(handler, CreateUrlStatsHandler)
-
-    def test_create_list_url_stats_handler(self):
-        uow = MagicMock()
-        handler = create_list_url_stats_handler(uow)
-        assert isinstance(handler, CreateListUrlStatsHandler)
-
-    def test_update_url_stats_handler(self):
-        uow = MagicMock()
-        handler = update_url_stats_handler(uow)
-        assert isinstance(handler, UpdateUrlStatsHandler)
-
-    def test_update_list_url_stats_handler(self):
-        uow = MagicMock()
-        handler = update_list_url_stats_handler(uow)
-        assert isinstance(handler, UpdateListUrlStatsHandler)
-
-    def test_delete_url_stats_handler(self):
-        uow = MagicMock()
-        handler = delete_url_stats_handler(uow)
-        assert isinstance(handler, DeleteUrlStatsHandler)
+        service = get_url_stats_service(uow)
+        assert isinstance(service, UrlStatsService)

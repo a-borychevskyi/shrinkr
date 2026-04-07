@@ -4,28 +4,8 @@ from unittest.mock import AsyncMock
 from fastapi import FastAPI
 from httpx import AsyncClient
 
-from src.di.handlers.url import (
-    create_url_handler,
-    create_list_url_handler,
-    delete_url_handler,
-    get_all_url_handler,
-    get_list_url_handler,
-    get_one_url_handler,
-    mark_as_active_url_handler,
-    mark_as_deleted_url_handler,
-    update_url_handler,
-    update_list_url_handler,
-)
-from src.di.handlers.url_stats import (
-    create_list_url_stats_handler,
-    create_url_stats_handler,
-    delete_url_stats_handler,
-    get_all_url_stats_handler,
-    get_list_url_stats_handler,
-    get_one_url_stats_handler,
-    update_list_url_stats_handler,
-    update_url_stats_handler,
-)
+from src.di.services.url import get_url_service
+from src.di.services.url_stats import get_url_stats_service
 from src.models.base import ManyCustomResponse
 from src.models.url.entity import UrlModel
 from src.models.url_stats.entity import UrlStatsModel
@@ -59,10 +39,14 @@ SAMPLE_STATS = [
 ]
 
 
-def _mock_handler(return_value=None, side_effect=None):
-    handler = AsyncMock()
-    handler.handle = AsyncMock(return_value=return_value, side_effect=side_effect)
-    return handler
+def _mock_service(**methods):
+    svc = AsyncMock()
+    for name, value in methods.items():
+        if isinstance(value, Exception):
+            getattr(svc, name).side_effect = value
+        else:
+            getattr(svc, name).return_value = value
+    return svc
 
 
 # --- Redirect endpoint ---
@@ -70,11 +54,11 @@ def _mock_handler(return_value=None, side_effect=None):
 
 class TestRedirectToUrl:
     async def test_redirect_returns_none(self, app: FastAPI, client: AsyncClient):
-        mock_get = _mock_handler(return_value=None)
-        mock_stats = _mock_handler()
+        mock_url = _mock_service(get_one=None)
+        mock_stats = _mock_service()
 
-        app.dependency_overrides[get_one_url_handler] = lambda: mock_get
-        app.dependency_overrides[create_url_stats_handler] = lambda: mock_stats
+        app.dependency_overrides[get_url_service] = lambda: mock_url
+        app.dependency_overrides[get_url_stats_service] = lambda: mock_stats
 
         response = await client.get(
             "/v0/shortner/", params={"short_code": "abc123"}, follow_redirects=False
@@ -82,14 +66,14 @@ class TestRedirectToUrl:
 
         assert response.status_code == 302
         assert response.headers["location"] == "/"
-        mock_stats.handle.assert_not_awaited()
+        mock_stats.create.assert_not_awaited()
 
     async def test_redirect_success(self, app: FastAPI, client: AsyncClient):
-        mock_get = _mock_handler(return_value=SAMPLE_URL)
-        mock_stats = _mock_handler(return_value=None)
+        mock_url = _mock_service(get_one=SAMPLE_URL)
+        mock_stats = _mock_service(create=None)
 
-        app.dependency_overrides[get_one_url_handler] = lambda: mock_get
-        app.dependency_overrides[create_url_stats_handler] = lambda: mock_stats
+        app.dependency_overrides[get_url_service] = lambda: mock_url
+        app.dependency_overrides[get_url_stats_service] = lambda: mock_stats
 
         response = await client.get(
             "/v0/shortner/", params={"short_code": "abc123"}, follow_redirects=False
@@ -97,15 +81,15 @@ class TestRedirectToUrl:
 
         assert response.status_code == 302
         assert response.headers["location"] == "https://example.com"
-        mock_get.handle.assert_awaited_once()
-        mock_stats.handle.assert_awaited_once()
+        mock_url.get_one.assert_awaited_once()
+        mock_stats.create.assert_awaited_once()
 
     async def test_redirect_not_found(self, app: FastAPI, client: AsyncClient):
-        mock_get = _mock_handler(side_effect=NotFound(message="Url not found"))
-        mock_stats = _mock_handler()
+        mock_url = _mock_service(get_one=NotFound(message="Url not found"))
+        mock_stats = _mock_service()
 
-        app.dependency_overrides[get_one_url_handler] = lambda: mock_get
-        app.dependency_overrides[create_url_stats_handler] = lambda: mock_stats
+        app.dependency_overrides[get_url_service] = lambda: mock_url
+        app.dependency_overrides[get_url_stats_service] = lambda: mock_stats
 
         response = await client.get(
             "/v0/shortner/", params={"short_code": "nonexistent"}
@@ -114,16 +98,16 @@ class TestRedirectToUrl:
         assert response.status_code == 404
         body = response.json()
         assert body["errors"][0]["type"] == "NOT_FOUND"
-        mock_stats.handle.assert_not_awaited()
+        mock_stats.create.assert_not_awaited()
 
     async def test_redirect_tracks_ip_and_user_agent(
         self, app: FastAPI, client: AsyncClient
     ):
-        mock_get = _mock_handler(return_value=SAMPLE_URL)
-        mock_stats = _mock_handler(return_value=None)
+        mock_url = _mock_service(get_one=SAMPLE_URL)
+        mock_stats = _mock_service(create=None)
 
-        app.dependency_overrides[get_one_url_handler] = lambda: mock_get
-        app.dependency_overrides[create_url_stats_handler] = lambda: mock_stats
+        app.dependency_overrides[get_url_service] = lambda: mock_url
+        app.dependency_overrides[get_url_stats_service] = lambda: mock_stats
 
         await client.get(
             "/v0/shortner/",
@@ -132,7 +116,7 @@ class TestRedirectToUrl:
             follow_redirects=False,
         )
 
-        call_kwargs = mock_stats.handle.call_args.kwargs
+        call_kwargs = mock_stats.create.call_args.kwargs
         assert call_kwargs["user_agent"] == "TestBot/1.0"
         assert call_kwargs["url_id"] == 1
 
@@ -147,11 +131,11 @@ class TestRedirectToUrl:
 
 class TestGetShortUrlStats:
     async def test_stats_success(self, app: FastAPI, client: AsyncClient):
-        mock_handler = _mock_handler(
-            return_value=ManyCustomResponse(count=2, data=SAMPLE_STATS)
+        mock_svc = _mock_service(
+            get_list=ManyCustomResponse(count=2, data=SAMPLE_STATS)
         )
 
-        app.dependency_overrides[get_list_url_stats_handler] = lambda: mock_handler
+        app.dependency_overrides[get_url_stats_service] = lambda: mock_svc
 
         response = await client.get(
             "/v0/shortner/stats", params={"short_code": "abc123"}
@@ -165,9 +149,9 @@ class TestGetShortUrlStats:
         assert body["payload"][1]["ip_address"] == "192.168.1.1"
 
     async def test_stats_not_found(self, app: FastAPI, client: AsyncClient):
-        mock_handler = _mock_handler(side_effect=NotFound(message="Url not found"))
+        mock_svc = _mock_service(get_list=NotFound(message="Url not found"))
 
-        app.dependency_overrides[get_list_url_stats_handler] = lambda: mock_handler
+        app.dependency_overrides[get_url_stats_service] = lambda: mock_svc
 
         response = await client.get(
             "/v0/shortner/stats", params={"short_code": "nonexistent"}
@@ -176,9 +160,9 @@ class TestGetShortUrlStats:
         assert response.status_code == 404
 
     async def test_stats_empty(self, app: FastAPI, client: AsyncClient):
-        mock_handler = _mock_handler(return_value=ManyCustomResponse(count=0, data=[]))
+        mock_svc = _mock_service(get_list=ManyCustomResponse(count=0, data=[]))
 
-        app.dependency_overrides[get_list_url_stats_handler] = lambda: mock_handler
+        app.dependency_overrides[get_url_stats_service] = lambda: mock_svc
 
         response = await client.get(
             "/v0/shortner/stats", params={"short_code": "abc123"}
@@ -199,9 +183,9 @@ class TestGetShortUrlStats:
 
 class TestCreateShortUrl:
     async def test_create_success(self, app: FastAPI, client: AsyncClient):
-        mock_handler = _mock_handler(return_value=SAMPLE_URL)
+        mock_svc = _mock_service(create=SAMPLE_URL)
 
-        app.dependency_overrides[create_url_handler] = lambda: mock_handler
+        app.dependency_overrides[get_url_service] = lambda: mock_svc
 
         response = await client.post(
             "/v0/shortner/", json={"target_url": "https://example.com"}
@@ -230,9 +214,9 @@ class TestCreateShortUrl:
 
 class TestDeactivateShortUrl:
     async def test_deactivate_success(self, app: FastAPI, client: AsyncClient):
-        mock_handler = _mock_handler(return_value=SAMPLE_URL)
+        mock_svc = _mock_service(mark_as_deleted=SAMPLE_URL)
 
-        app.dependency_overrides[mark_as_deleted_url_handler] = lambda: mock_handler
+        app.dependency_overrides[get_url_service] = lambda: mock_svc
 
         response = await client.post(
             "/v0/shortner/deactivate", json={"short_code": "abc123"}
@@ -244,9 +228,9 @@ class TestDeactivateShortUrl:
         assert body["status_code"] == 200
 
     async def test_deactivate_not_found(self, app: FastAPI, client: AsyncClient):
-        mock_handler = _mock_handler(return_value=None)
+        mock_svc = _mock_service(mark_as_deleted=None)
 
-        app.dependency_overrides[mark_as_deleted_url_handler] = lambda: mock_handler
+        app.dependency_overrides[get_url_service] = lambda: mock_svc
 
         response = await client.post(
             "/v0/shortner/deactivate", json={"short_code": "nonexistent"}
@@ -268,9 +252,9 @@ class TestDeactivateShortUrl:
 
 class TestActivateShortUrl:
     async def test_activate_success(self, app: FastAPI, client: AsyncClient):
-        mock_handler = _mock_handler(return_value=SAMPLE_URL)
+        mock_svc = _mock_service(mark_as_active=SAMPLE_URL)
 
-        app.dependency_overrides[mark_as_active_url_handler] = lambda: mock_handler
+        app.dependency_overrides[get_url_service] = lambda: mock_svc
 
         response = await client.post(
             "/v0/shortner/activate", json={"short_code": "abc123"}
@@ -282,9 +266,9 @@ class TestActivateShortUrl:
         assert body["status_code"] == 200
 
     async def test_activate_not_found(self, app: FastAPI, client: AsyncClient):
-        mock_handler = _mock_handler(return_value=None)
+        mock_svc = _mock_service(mark_as_active=None)
 
-        app.dependency_overrides[mark_as_active_url_handler] = lambda: mock_handler
+        app.dependency_overrides[get_url_service] = lambda: mock_svc
 
         response = await client.post(
             "/v0/shortner/activate", json={"short_code": "nonexistent"}
@@ -306,9 +290,9 @@ class TestActivateShortUrl:
 
 class TestDeleteShortUrl:
     async def test_delete_success(self, app: FastAPI, client: AsyncClient):
-        mock_handler = _mock_handler(return_value=1)
+        mock_svc = _mock_service(delete=1)
 
-        app.dependency_overrides[delete_url_handler] = lambda: mock_handler
+        app.dependency_overrides[get_url_service] = lambda: mock_svc
 
         response = await client.delete(
             "/v0/shortner/abc123", params={"short_code": "abc123"}
@@ -319,9 +303,9 @@ class TestDeleteShortUrl:
         assert body["payload"]["message"] == "Short URL deleted"
 
     async def test_delete_not_found(self, app: FastAPI, client: AsyncClient):
-        mock_handler = _mock_handler(side_effect=NotFound(message="Url not found"))
+        mock_svc = _mock_service(delete=NotFound(message="Url not found"))
 
-        app.dependency_overrides[delete_url_handler] = lambda: mock_handler
+        app.dependency_overrides[get_url_service] = lambda: mock_svc
 
         response = await client.delete(
             "/v0/shortner/abc123", params={"short_code": "abc123"}
@@ -330,5 +314,3 @@ class TestDeleteShortUrl:
         assert response.status_code == 404
         body = response.json()
         assert body["errors"][0]["type"] == "NOT_FOUND"
-
-
