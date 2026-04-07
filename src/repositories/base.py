@@ -1,29 +1,31 @@
 from __future__ import annotations
 
-from typing import Any, Sequence, Type, cast
+from typing import Any, Generic, Sequence, Type, TypeVar, cast
 
 from loguru import logger
 from sqlalchemy import ColumnExpressionArgument, delete, func, insert, select, update
 from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.models.base import PydanticOrmModel
+from src.orm.filters.base import BaseFilterModel
 from src.orm.models.base import Base
-from src.utils.types.type_variables import (
-    CreateModelT,
-    FilterModelT,
-    SortModelT,
-    UpdateModelT,
-)
+from src.orm.sorters.base import BaseSortModel
+
+ModelT = TypeVar("ModelT", bound=Base)
+FilterT = TypeVar("FilterT", bound=BaseFilterModel)
+SortT = TypeVar("SortT", bound=BaseSortModel)
+SchemaT = TypeVar("SchemaT", bound=PydanticOrmModel)
 
 
-class DatabaseRepository[AbstractModel: Base]:
-    __model__: Type[AbstractModel]
+class DatabaseRepository(Generic[ModelT, FilterT, SortT, SchemaT]):
+    __model__: Type[ModelT]
 
     async def get_one(
         self,
         async_session: AsyncSession,
-        filters: FilterModelT,
-    ) -> AbstractModel | None:
+        filters: FilterT,
+    ) -> Any:
         sql = filters.generate_filtered_query(expression=select(self.__model__))
         result = await async_session.execute(statement=sql)
         if not (orm_model := result.scalar_one_or_none()):
@@ -35,11 +37,11 @@ class DatabaseRepository[AbstractModel: Base]:
     async def get_list(
         self,
         async_session: AsyncSession,
-        filters: FilterModelT,
-        sorters: SortModelT,
+        filters: FilterT,
+        sorters: SortT,
         page: int = 1,
         per_page: int = 10,
-    ) -> tuple[int, list[AbstractModel]]:
+    ) -> Any:
         sql = filters.generate_filtered_query(expression=select(self.__model__))
         result = await async_session.execute(
             sql.order_by(*sorters.generate_params())
@@ -57,9 +59,9 @@ class DatabaseRepository[AbstractModel: Base]:
     async def get_all(
         self,
         async_session: AsyncSession,
-        filters: FilterModelT,
-        sorters: SortModelT,
-    ) -> Sequence[AbstractModel]:
+        filters: FilterT,
+        sorters: SortT,
+    ) -> Any:
         sql = filters.generate_filtered_query(expression=select(self.__model__))
         result = await async_session.execute(
             statement=sql.order_by(*sorters.generate_params())
@@ -69,7 +71,7 @@ class DatabaseRepository[AbstractModel: Base]:
     async def create(
         self,
         async_session: AsyncSession,
-        model: CreateModelT,
+        model: SchemaT,
     ) -> Any | None:
         sql = insert(self.__model__).values(model.to_orm()).returning(self.__model__)
         return (await async_session.execute(statement=sql)).scalar()
@@ -77,7 +79,7 @@ class DatabaseRepository[AbstractModel: Base]:
     async def create_many(
         self,
         async_session: AsyncSession,
-        models: list[CreateModelT],
+        models: Sequence[SchemaT],
     ) -> int:
         sql = insert(self.__model__).values([model.to_orm() for model in models])
         return cast(
@@ -88,7 +90,7 @@ class DatabaseRepository[AbstractModel: Base]:
         self,
         *clauses: ColumnExpressionArgument,
         async_session: AsyncSession,
-        model: UpdateModelT,
+        model: SchemaT,
     ):
         sql = (
             update(self.__model__)
@@ -102,7 +104,7 @@ class DatabaseRepository[AbstractModel: Base]:
         self,
         *clauses: ColumnExpressionArgument,
         async_session: AsyncSession,
-        models: list[UpdateModelT],
+        models: Sequence[SchemaT],
     ):
         sql = (
             update(self.__model__)

@@ -6,12 +6,8 @@ from prometheus_client import Counter, Histogram
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
 
-_OPERATION_RE = re.compile(
-    r"^\s*(SELECT|INSERT|UPDATE|DELETE|WITH)\b", re.IGNORECASE
-)
-_TABLE_RE = re.compile(
-    r"(?:FROM|INTO|UPDATE|JOIN)\s+([\"']?\w+[\"']?)", re.IGNORECASE
-)
+_OPERATION_RE = re.compile(r"^\s*(SELECT|INSERT|UPDATE|DELETE|WITH)\b", re.IGNORECASE)
+_TABLE_RE = re.compile(r"(?:FROM|INTO|UPDATE|JOIN)\s+([\"']?\w+[\"']?)", re.IGNORECASE)
 
 sql_query_duration = Histogram(
     "sql_query_duration_seconds",

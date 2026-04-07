@@ -8,7 +8,7 @@ from src.orm.sorters.url_stats import UrlStatsSortModel
 from src.repositories.base import DatabaseRepository
 
 
-class UrlStatsRepository(DatabaseRepository):
+class UrlStatsRepository(DatabaseRepository[UrlStats, UrlStatsFilter, UrlStatsSortModel, UrlStatsModel]):
     __model__ = UrlStats
 
     async def get_one(

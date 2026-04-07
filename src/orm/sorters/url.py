@@ -28,9 +28,9 @@ class UrlSortValues(StrEnum):
 
 
 class UrlSortModel(BaseSortModel):
-    id: Annotated[SortOption | None, Field(default=None)]
-    target_url: Annotated[SortOption | None, Field(default=None)]
-    short_code: Annotated[SortOption | None, Field(default=None)]
-    created_at: Annotated[SortOption | None, Field(default=None)]
-    updated_at: Annotated[SortOption | None, Field(default=None)]
-    deleted_at: Annotated[SortOption | None, Field(default=None)]
+    id: Annotated[SortOption | None, Field()] = None
+    target_url: Annotated[SortOption | None, Field()] = None
+    short_code: Annotated[SortOption | None, Field()] = None
+    created_at: Annotated[SortOption | None, Field()] = None
+    updated_at: Annotated[SortOption | None, Field()] = None
+    deleted_at: Annotated[SortOption | None, Field()] = None

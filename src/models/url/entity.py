@@ -7,12 +7,12 @@ from src.models.base import PydanticOrmModel
 
 
 class UrlModel(PydanticOrmModel):
-    id: Annotated[int | None, Field(default=None)]
+    id: Annotated[int | None, Field()] = None
     target_url: Annotated[str, Field()]
     short_code: Annotated[str, Field()]
-    created_at: Annotated[datetime | None, Field(default=None)]
-    updated_at: Annotated[datetime | None, Field(default=None)]
-    deleted_at: Annotated[datetime | None, Field(default=None)]
+    created_at: Annotated[datetime | None, Field()] = None
+    updated_at: Annotated[datetime | None, Field()] = None
+    deleted_at: Annotated[datetime | None, Field()] = None
 
     def to_orm(self):
         return self.model_dump(exclude_unset=True)

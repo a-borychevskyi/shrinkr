@@ -116,7 +116,7 @@ class CreateListUrlStatsHandler:
         self.url_stats_repository = url_stats_repository
         self.uow = uow
 
-    async def handle(self, models: ...) -> int:
+    async def handle(self, models: list[UrlStatsModel]) -> int:
         async with self.uow as uow:
             session = uow.session
 

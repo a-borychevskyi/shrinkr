@@ -28,9 +28,9 @@ class UrlStatsSortValues(StrEnum):
 
 
 class UrlStatsSortModel(BaseSortModel):
-    id: Annotated[SortOption | None, Field(default=None)]
-    url_id: Annotated[SortOption | None, Field(default=None)]
-    user_agent: Annotated[SortOption | None, Field(default=None)]
-    ip_address: Annotated[SortOption | None, Field(default=None)]
-    redirect_elapsed_ms: Annotated[SortOption | None, Field(default=None)]
-    access_time: Annotated[SortOption | None, Field(default=None)]
+    id: Annotated[SortOption | None, Field()] = None
+    url_id: Annotated[SortOption | None, Field()] = None
+    user_agent: Annotated[SortOption | None, Field()] = None
+    ip_address: Annotated[SortOption | None, Field()] = None
+    redirect_elapsed_ms: Annotated[SortOption | None, Field()] = None
+    access_time: Annotated[SortOption | None, Field()] = None

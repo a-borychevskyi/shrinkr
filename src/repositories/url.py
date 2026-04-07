@@ -12,7 +12,7 @@ from src.orm.sorters.url import UrlSortModel
 from src.repositories.base import DatabaseRepository
 
 
-class UrlRepository(DatabaseRepository):
+class UrlRepository(DatabaseRepository[Url, UrlFilter, UrlSortModel, UrlModel]):
     __model__ = Url
 
     @staticmethod

@@ -14,6 +14,7 @@ from src.di.handlers.url_stats import (
     get_list_url_stats_handler,
 )
 from src.orm.filters.url import UrlFilter
+from src.utils.enums.sort import SortOption
 
 router = APIRouter(prefix="/shortner", tags=["Stats"])
 
@@ -26,11 +27,11 @@ async def get_short_url_stats(
     get_list_handler: Annotated[
         GetListUrlStatsHandler, Depends(get_list_url_stats_handler)
     ],
-) -> BasePayloadResponse[GetShortUrlStatsResponse]:
+) -> BasePayloadResponse[list[GetShortUrlStatsResponse]]:
     filters = UrlFilter(short_code=query_params.short_code)
     response = await get_list_handler.handle(
         filters,
-        sorters=UrlStatsSortModel(access_time="ASC"),
+        sorters=UrlStatsSortModel(access_time=SortOption.ASC),
     )
     return BasePayloadResponse(
         payload=[

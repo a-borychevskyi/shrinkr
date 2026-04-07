@@ -14,7 +14,7 @@ class ErrorModel(BaseEntityModel):
         str | None,
         Field(description="Error class name", alias="errorClass"),
     ] = None
-    type: Annotated[str, Field(description="Error type")] = None
+    type: Annotated[str | None, Field(description="Error type")] = None
     error_message: Annotated[
         str | None,
         Field(description="Error message", alias="errorMessage"),

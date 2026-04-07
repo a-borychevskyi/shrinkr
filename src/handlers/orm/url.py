@@ -9,7 +9,6 @@ from src.orm.sorters.url import UrlSortModel
 from src.repositories.uow import UnitOfWork
 from src.repositories.url import UrlRepository
 from src.utils.exceptions.base import NotFound
-from src.utils.types.type_variables import FilterModelT
 
 
 class GetOneUrlHandler:
@@ -17,7 +16,7 @@ class GetOneUrlHandler:
         self.url_repository = url_repository
         self.uow = uow
 
-    async def handle(self, filters: FilterModelT) -> UrlModel | None:
+    async def handle(self, filters: UrlFilter) -> UrlModel | None:
         async with self.uow as uow:
             session = uow.session
 
