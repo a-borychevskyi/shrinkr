@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import (
 )
 
 from src.config.database import DatabaseConfig
+from src.orm.metrics import register_query_metrics
 
 
 class Database:
@@ -14,6 +15,7 @@ class Database:
         self.async_engine = create_async_engine(
             url=config.DB_URL, pool_pre_ping=True, pool_size=30, max_overflow=0
         )
+        register_query_metrics(self.async_engine.sync_engine)
         self.session_factory = async_scoped_session(
             async_sessionmaker(
                 self.async_engine,

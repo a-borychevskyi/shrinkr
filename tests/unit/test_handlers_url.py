@@ -85,9 +85,7 @@ class TestCreateUrlHandler:
     async def test_retries_on_duplicate_code(self):
         repo = _make_repo()
         # 3 calls in loop + 1 call when building the model
-        repo.get_short_code = MagicMock(
-            side_effect=["dup", "dup", "unique", "final"]
-        )
+        repo.get_short_code = MagicMock(side_effect=["dup", "dup", "unique", "final"])
         repo.get_one = AsyncMock(side_effect=[SAMPLE_URL, SAMPLE_URL, None])
         repo.create = AsyncMock(return_value=SAMPLE_URL)
         uow = _make_uow()
@@ -239,9 +237,7 @@ class TestCreateListUrlHandler:
         uow = _make_uow()
 
         handler = CreateListUrlHandler(url_repository=repo, uow=uow)
-        result = await handler.handle(
-            ["https://example.com", "https://example.org"]
-        )
+        result = await handler.handle(["https://example.com", "https://example.org"])
 
         assert result == 2
         repo.create_list.assert_awaited_once()

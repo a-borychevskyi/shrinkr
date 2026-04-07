@@ -1,0 +1,508 @@
+{
+  "editable": true,
+  "graphTooltip": 1,
+  "links": [],
+  "panels": [
+    {
+      "type": "row",
+      "title": "Overview",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "collapsed": false
+    },
+    {
+      "type": "stat",
+      "title": "Total Queries (5m)",
+      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 1 },
+      "datasource": { "type": "prometheus", "uid": "ds-prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 500 },
+              { "color": "red", "value": 2000 }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "background",
+        "graphMode": "area"
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(sql_query_total[5m]))",
+          "legendFormat": "Queries"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Avg Query Time (5m)",
+      "gridPos": { "h": 6, "w": 6, "x": 6, "y": 1 },
+      "datasource": { "type": "prometheus", "uid": "ds-prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 0.05 },
+              { "color": "red", "value": 0.2 }
+            ]
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "background",
+        "graphMode": "area"
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(sql_query_duration_seconds_sum[5m])) / sum(rate(sql_query_duration_seconds_count[5m]))",
+          "legendFormat": "Avg"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Query Errors (5m)",
+      "gridPos": { "h": 6, "w": 6, "x": 12, "y": 1 },
+      "datasource": { "type": "prometheus", "uid": "ds-prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 10 }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "background",
+        "graphMode": "area"
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(sql_query_errors_total[5m]))",
+          "legendFormat": "Errors"
+        }
+      ]
+    },
+    {
+      "type": "gauge",
+      "title": "Query Error Rate",
+      "gridPos": { "h": 6, "w": 6, "x": 18, "y": 1 },
+      "datasource": { "type": "prometheus", "uid": "ds-prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 0.01 },
+              { "color": "red", "value": 0.05 }
+            ]
+          },
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(sql_query_errors_total[5m])) / sum(rate(sql_query_total[5m]))",
+          "legendFormat": "Error Rate"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Query Rate & Latency",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 7 },
+      "collapsed": false
+    },
+    {
+      "type": "timeseries",
+      "title": "Query Rate by Operation",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "ds-prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 15,
+            "stacking": { "mode": "none" }
+          },
+          "unit": "ops"
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "SELECT" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "blue", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "INSERT" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "UPDATE" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "DELETE" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }]
+          }
+        ]
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max", "sum"] },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "expr": "sum by (operation) (rate(sql_query_total[1m]))",
+          "legendFormat": "{{operation}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Query Duration Percentiles",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "ds-prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 10
+          },
+          "unit": "s"
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "p99" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "p95" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "p50" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }]
+          }
+        ]
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(sql_query_duration_seconds_bucket[5m])))",
+          "legendFormat": "p50"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(sql_query_duration_seconds_bucket[5m])))",
+          "legendFormat": "p95"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(sql_query_duration_seconds_bucket[5m])))",
+          "legendFormat": "p99"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Per-Table Breakdown",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 16 },
+      "collapsed": false
+    },
+    {
+      "type": "timeseries",
+      "title": "Query Rate by Table",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 17 },
+      "datasource": { "type": "prometheus", "uid": "ds-prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 50,
+            "stacking": { "mode": "normal" }
+          },
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "sum"] },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "expr": "sum by (table) (rate(sql_query_total[5m]))",
+          "legendFormat": "{{table}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Avg Latency by Table",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 17 },
+      "datasource": { "type": "prometheus", "uid": "ds-prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 10
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "expr": "sum by (table) (rate(sql_query_duration_seconds_sum[5m])) / sum by (table) (rate(sql_query_duration_seconds_count[5m]))",
+          "legendFormat": "{{table}}"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Top Queries & Operation Mix",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 25 },
+      "collapsed": false
+    },
+    {
+      "type": "table",
+      "title": "Top Queries by Avg Duration (1h)",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 26 },
+      "datasource": { "type": "prometheus", "uid": "ds-prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": { "filterable": true }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Value" },
+            "properties": [
+              { "id": "custom.cellOptions", "value": { "type": "color-background" } },
+              {
+                "id": "thresholds",
+                "value": {
+                  "steps": [
+                    { "color": "transparent", "value": null },
+                    { "color": "yellow", "value": 0.01 },
+                    { "color": "orange", "value": 0.05 },
+                    { "color": "red", "value": 0.1 }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "sortBy": [{ "displayName": "Value", "desc": true }]
+      },
+      "targets": [
+        {
+          "expr": "topk(10, sum by (operation, table) (rate(sql_query_duration_seconds_sum[1h])) / sum by (operation, table) (rate(sql_query_duration_seconds_count[1h])))",
+          "legendFormat": "{{operation}} {{table}}",
+          "format": "table",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "type": "piechart",
+      "title": "Query Mix by Operation (1h)",
+      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 26 },
+      "datasource": { "type": "prometheus", "uid": "ds-prometheus" },
+      "fieldConfig": {
+        "defaults": { "unit": "short" },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "SELECT" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "blue", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "INSERT" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "UPDATE" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "DELETE" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }]
+          }
+        ]
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "right", "values": ["value", "percent"] },
+        "pieType": "donut",
+        "reduceOptions": { "calcs": ["lastNotNull"] }
+      },
+      "targets": [
+        {
+          "expr": "sum by (operation) (increase(sql_query_total[1h]))",
+          "legendFormat": "{{operation}}"
+        }
+      ]
+    },
+    {
+      "type": "table",
+      "title": "Top Tables by Query Count (1h)",
+      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 26 },
+      "datasource": { "type": "prometheus", "uid": "ds-prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": { "filterable": true }
+        },
+        "overrides": []
+      },
+      "options": {
+        "sortBy": [{ "displayName": "Value", "desc": true }]
+      },
+      "targets": [
+        {
+          "expr": "topk(10, sum by (table, operation) (increase(sql_query_total[1h])))",
+          "legendFormat": "{{operation}} {{table}}",
+          "format": "table",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Full Query Logs (Loki)",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 34 },
+      "collapsed": false
+    },
+    {
+      "type": "logs",
+      "title": "All SQL Queries",
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 35 },
+      "datasource": { "type": "loki", "uid": "ds-loki" },
+      "options": {
+        "showTime": true,
+        "showLabels": false,
+        "showCommonLabels": false,
+        "wrapLogMessage": true,
+        "sortOrder": "Descending",
+        "enableLogDetails": true
+      },
+      "targets": [
+        {
+          "expr": "{container_name=\"the-app\"} |= `sql_query `",
+          "legendFormat": ""
+        }
+      ]
+    },
+    {
+      "type": "logs",
+      "title": "Slow Queries (> 50ms)",
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 45 },
+      "datasource": { "type": "loki", "uid": "ds-loki" },
+      "options": {
+        "showTime": true,
+        "showLabels": false,
+        "showCommonLabels": false,
+        "wrapLogMessage": true,
+        "sortOrder": "Descending",
+        "enableLogDetails": true
+      },
+      "targets": [
+        {
+          "expr": "{container_name=\"the-app\"} |= `sql_query ` | pattern `<_> duration=<duration>s <_>` | unwrap duration | duration > 0.05",
+          "legendFormat": ""
+        }
+      ]
+    },
+    {
+      "type": "logs",
+      "title": "Failed Queries",
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 55 },
+      "datasource": { "type": "loki", "uid": "ds-loki" },
+      "options": {
+        "showTime": true,
+        "showLabels": false,
+        "showCommonLabels": false,
+        "wrapLogMessage": true,
+        "sortOrder": "Descending",
+        "enableLogDetails": true
+      },
+      "targets": [
+        {
+          "expr": "{container_name=\"the-app\"} |= `sql_query_error`",
+          "legendFormat": ""
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Latency by Operation × Table",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 65 },
+      "collapsed": false
+    },
+    {
+      "type": "timeseries",
+      "title": "p95 Latency per Operation × Table",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 66 },
+      "datasource": { "type": "prometheus", "uid": "ds-prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 10
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, operation, table) (rate(sql_query_duration_seconds_bucket[5m])))",
+          "legendFormat": "{{operation}} {{table}}"
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["shrinkr", "sql", "database", "postgresql"],
+  "templating": { "list": [] },
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Shrinkr SQL Queries",
+  "uid": "shrinkr-sql",
+  "version": 1,
+  "refresh": "10s"
+}

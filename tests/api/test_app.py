@@ -41,9 +41,7 @@ class TestExceptionHandlers:
         assert "errorClass" in body["errors"][0]
 
     async def test_validation_error_has_field_name(self, client: AsyncClient):
-        response = await client.post(
-            "/v0/shortner/", json={"target_url": 12345}
-        )
+        response = await client.post("/v0/shortner/", json={"target_url": 12345})
 
         assert response.status_code == 422
         body = response.json()

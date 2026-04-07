@@ -150,9 +150,7 @@ class TestGetShortUrlStats:
         assert response.status_code == 404
 
     async def test_stats_empty(self, app: FastAPI, client: AsyncClient):
-        mock_handler = _mock_handler(
-            return_value=ManyCustomResponse(count=0, data=[])
-        )
+        mock_handler = _mock_handler(return_value=ManyCustomResponse(count=0, data=[]))
 
         app.dependency_overrides[get_list_url_stats_handler] = lambda: mock_handler
 

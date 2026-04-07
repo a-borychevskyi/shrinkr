@@ -84,12 +84,8 @@ class CreateUrlHandler:
                     break
 
             model_to_create = UrlModel(
-                id=None,
                 target_url=target_url,
                 short_code=self.url_repository.get_short_code(),
-                created_at=None,
-                updated_at=None,
-                deleted_at=None,
             )
 
             return await self.url_repository.create(
@@ -108,12 +104,8 @@ class CreateListUrlHandler:
 
             models_to_create = [
                 UrlModel(
-                    id=None,
                     target_url=url,
                     short_code=self.url_repository.get_short_code(),
-                    created_at=None,
-                    updated_at=None,
-                    deleted_at=None,
                 )
                 for url in target_urls
             ]
