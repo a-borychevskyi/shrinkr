@@ -191,10 +191,9 @@ class TestCreateShortUrl:
             "/v0/shortner/", json={"target_url": "https://example.com"}
         )
 
-        assert response.status_code == 200
+        assert response.status_code == 201
         body = response.json()
         assert body["payload"]["short_code"] == "abc123"
-        assert body["status_code"] == 201
 
     async def test_create_invalid_url(self, client: AsyncClient):
         response = await client.post("/v0/shortner/", json={"target_url": "not-a-url"})
@@ -225,7 +224,6 @@ class TestDeactivateShortUrl:
         assert response.status_code == 200
         body = response.json()
         assert body["payload"]["message"] == "Short URL deactivated"
-        assert body["status_code"] == 200
 
     async def test_deactivate_not_found(self, app: FastAPI, client: AsyncClient):
         mock_svc = _mock_service(mark_as_deleted=None)
@@ -236,9 +234,8 @@ class TestDeactivateShortUrl:
             "/v0/shortner/deactivate", json={"short_code": "nonexistent"}
         )
 
-        assert response.status_code == 200
+        assert response.status_code == 404
         body = response.json()
-        assert body["status_code"] == 404
         assert "not found or already deactivated" in body["payload"]["message"]
 
     async def test_deactivate_missing_body(self, client: AsyncClient):
@@ -263,7 +260,6 @@ class TestActivateShortUrl:
         assert response.status_code == 200
         body = response.json()
         assert body["payload"]["message"] == "Short URL activated"
-        assert body["status_code"] == 200
 
     async def test_activate_not_found(self, app: FastAPI, client: AsyncClient):
         mock_svc = _mock_service(mark_as_active=None)
@@ -274,9 +270,8 @@ class TestActivateShortUrl:
             "/v0/shortner/activate", json={"short_code": "nonexistent"}
         )
 
-        assert response.status_code == 200
+        assert response.status_code == 404
         body = response.json()
-        assert body["status_code"] == 404
         assert "not found or already activated" in body["payload"]["message"]
 
     async def test_activate_missing_body(self, client: AsyncClient):

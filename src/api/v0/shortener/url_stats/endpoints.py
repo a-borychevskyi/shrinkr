@@ -29,9 +29,9 @@ async def get_short_url_stats(
         filters,
         sorters=UrlStatsSortModel(access_time=SortOption.ASC),
     )
-    return BasePayloadResponse(
+    return BasePayloadResponse[list[GetShortUrlStatsResponse]](
         payload=[
-            GetShortUrlStatsResponse.model_validate(model) for model in response.data
+            GetShortUrlStatsResponse.model_validate(model)
+            for model in response.data
         ],
-        status_code=200,
     )

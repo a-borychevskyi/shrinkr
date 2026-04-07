@@ -47,20 +47,20 @@ class TestActivateUrlRequest:
 
 
 class TestBasePayloadResponse:
-    def test_default_status_code(self):
+    def test_payload_set(self):
 
         class TestResponse(BaseResponse):
             value: str
 
         resp = BasePayloadResponse[TestResponse](payload=TestResponse(value="test"))
-        assert resp.status_code == 200
+        assert resp.payload.value == "test"
 
-    def test_custom_status_code(self):
+    def test_payload_list(self):
 
         class TestResponse(BaseResponse):
             value: str
 
-        resp = BasePayloadResponse[TestResponse](
-            payload=TestResponse(value="test"), status_code=201
+        resp = BasePayloadResponse[list[TestResponse]](
+            payload=[TestResponse(value="a"), TestResponse(value="b")]
         )
-        assert resp.status_code == 201
+        assert len(resp.payload) == 2

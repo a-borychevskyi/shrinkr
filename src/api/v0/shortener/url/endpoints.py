@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, Query, Request, Response
 from fastapi.params import Depends
 from fastapi.responses import RedirectResponse
 
@@ -56,17 +56,17 @@ async def redirect_to_url(
 async def deactivate_short_url(
     body: DeactivateUrlRequest,
     url_service: Annotated[UrlService, Depends(get_url_service)],
+    response: Response,
 ) -> BasePayloadResponse[DeactivateUrlResponse]:
-    response = await url_service.mark_as_deleted(body.short_code)
+    result = await url_service.mark_as_deleted(body.short_code)
 
     message = "Short URL deactivated"
-    status_code = 200
-    if response is None:
+    if result is None:
         message = "Short URL is either not found or already deactivated"
-        status_code = 404
+        response.status_code = 404
 
-    return BasePayloadResponse(
-        payload=DeactivateUrlResponse(message=message), status_code=status_code
+    return BasePayloadResponse[DeactivateUrlResponse](
+        payload=DeactivateUrlResponse(message=message),
     )
 
 
@@ -74,38 +74,43 @@ async def deactivate_short_url(
 async def activate_short_url(
     body: ActivateUrlRequest,
     url_service: Annotated[UrlService, Depends(get_url_service)],
+    response: Response,
 ) -> BasePayloadResponse[ActivateUrlResponse]:
-    response = await url_service.mark_as_active(body.short_code)
+    result = await url_service.mark_as_active(body.short_code)
 
     message = "Short URL activated"
-    status_code = 200
-    if response is None:
+    if result is None:
         message = "Short URL is either not found or already activated"
-        status_code = 404
+        response.status_code = 404
 
-    return BasePayloadResponse(
-        payload=ActivateUrlResponse(message=message), status_code=status_code
+    return BasePayloadResponse[ActivateUrlResponse](
+        payload=ActivateUrlResponse(message=message),
     )
 
 
-@router.post("/", response_model=BasePayloadResponse[CreateShortUrlResponse])
+@router.post(
+    "/",
+    response_model=BasePayloadResponse[CreateShortUrlResponse],
+    status_code=201,
+)
 async def create_short_url(
     body: CreateShortUrlRequest,
     url_service: Annotated[UrlService, Depends(get_url_service)],
 ) -> BasePayloadResponse[CreateShortUrlResponse]:
-    response = await url_service.create(str(body.target_url))
-    return BasePayloadResponse(
-        payload=CreateShortUrlResponse(short_code=response.short_code),
-        status_code=201,
+    result = await url_service.create(str(body.target_url))
+    return BasePayloadResponse[CreateShortUrlResponse](
+        payload=CreateShortUrlResponse(short_code=result.short_code),
     )
 
 
-@router.delete("/{short_code}", response_model=BasePayloadResponse[DeleteUrlResponse])
+@router.delete(
+    "/{short_code}", response_model=BasePayloadResponse[DeleteUrlResponse]
+)
 async def delete_short_url(
     query_params: Annotated[DeleteUrlRequest, Query()],
     url_service: Annotated[UrlService, Depends(get_url_service)],
 ) -> BasePayloadResponse[DeleteUrlResponse]:
     await url_service.delete(query_params.short_code)
-    return BasePayloadResponse(
-        payload=DeleteUrlResponse(message="Short URL deleted"), status_code=200
+    return BasePayloadResponse[DeleteUrlResponse](
+        payload=DeleteUrlResponse(message="Short URL deleted"),
     )
