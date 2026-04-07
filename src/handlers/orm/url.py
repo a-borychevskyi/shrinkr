@@ -53,10 +53,6 @@ class CreateUrlHandler:
         self.url_repository = url_repository
         self.uow = uow
 
-    @staticmethod
-    def get_short_code():
-        return token_urlsafe(12)
-
     async def handle(self, model):
         async with self.uow as uow:
             session = uow.session
@@ -64,7 +60,7 @@ class CreateUrlHandler:
             model_to_create = UrlModel(
                 id=None,
                 target_url=model.target_url,
-                short_code=self.get_short_code(),
+                short_code=self.url_repository.get_short_code(model=model),
                 created_at=None,
                 updated_at=None,
                 deleted_at=None,

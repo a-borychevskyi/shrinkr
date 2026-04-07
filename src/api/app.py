@@ -4,6 +4,7 @@ from fastapi import FastAPI
 
 from src.api.v0 import v0_router
 from src.di.orm.database import get_db
+from src.api.exceptions import ExceptionHandler
 
 
 @asynccontextmanager
@@ -23,4 +24,5 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
     app.include_router(v0_router)
+    ExceptionHandler(app).register_handlers()
     return app

@@ -30,6 +30,7 @@ class DatabaseRepository[AbstractModel: Base]:
         if not (orm_model := result.scalar_one_or_none()):
             message = f"Unable to get: does not have any records for sql: {sql} by provided filters: {filters}"
             logger.warning(message)
+            return None
         return orm_model
 
     async def get_list(

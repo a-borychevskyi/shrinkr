@@ -33,13 +33,19 @@ from src.orm.filters.url import UrlFilter
 router = APIRouter(prefix="/shortner", tags=["shortener"])
 
 
-@router.get("/", response_model=None, status_code=302)
+@router.get(
+    "/",
+    response_model=None,
+    status_code=302,
+)
 async def redirect_to_url(
     query_params: Annotated[RedirectToUrlRequest, Query()],
     get_one_handler: Annotated[GetOneUrlHandler, Depends(get_one_url_handler)],
 ) -> RedirectResponse:
     filters = UrlFilter(short_code=query_params.short_code)
     response = await get_one_handler.handle(filters)
+    if response is None:
+        return RedirectResponse(url="/", status_code=302)
     return RedirectResponse(url=response.target_url, status_code=302)
 
 

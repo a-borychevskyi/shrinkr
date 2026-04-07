@@ -28,6 +28,8 @@ class UrlRepository(DatabaseRepository):
         filters: UrlFilter,
     ) -> UrlModel | None:
         result = await super().get_one(async_session, filters)
+        if not result:
+            return None
         return UrlModel.model_validate(result)
 
     async def get_list(
@@ -60,7 +62,6 @@ class UrlRepository(DatabaseRepository):
         async_session: AsyncSession,
         model: UrlModel,
     ) -> UrlModel:
-        model.short_code = self.get_short_code(model=model)
         result = await super().create(async_session, model)
         return UrlModel.model_validate(result)
 
@@ -69,8 +70,6 @@ class UrlRepository(DatabaseRepository):
         async_session: AsyncSession,
         models: list[UrlModel],
     ) -> int:
-        for model in models:
-            model.short_code = self.get_short_code(model)
         return await super().create_many(async_session, models)
 
     async def update_one(
