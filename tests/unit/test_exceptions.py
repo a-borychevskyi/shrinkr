@@ -118,3 +118,25 @@ class TestValidationErrorException:
     def test_empty_errors_list(self):
         exc = ValidationError(message="no errors added")
         assert exc.errors == []
+
+
+class TestExceptionToErrorResponse:
+    def test_unprocessable_entity_to_error_response(self):
+        exc = UnprocessableEntity(message="bad entity")
+        resp = exc.to_error_response()
+        assert len(resp.errors) == 1
+        assert resp.errors[0].type == "UNPROCESSABLE_ENTITY"
+
+    def test_bad_request_to_error_response(self):
+        exc = BadRequest(message="bad input")
+        resp = exc.to_error_response()
+        assert len(resp.errors) == 1
+        assert resp.errors[0].type == "BAD_REQUEST"
+
+    def test_external_service_error_to_error_response(self):
+        exc = ExternalServiceError(
+            message="upstream down", upstream_url="https://api.example.com"
+        )
+        resp = exc.to_error_response()
+        assert len(resp.errors) == 1
+        assert resp.errors[0].type == "EXTERNAL_SERVICE_ERROR"

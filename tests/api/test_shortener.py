@@ -6,14 +6,25 @@ from httpx import AsyncClient
 
 from src.di.handlers.url import (
     create_url_handler,
+    create_list_url_handler,
     delete_url_handler,
+    get_all_url_handler,
+    get_list_url_handler,
     get_one_url_handler,
     mark_as_active_url_handler,
     mark_as_deleted_url_handler,
+    update_url_handler,
+    update_list_url_handler,
 )
 from src.di.handlers.url_stats import (
+    create_list_url_stats_handler,
     create_url_stats_handler,
+    delete_url_stats_handler,
+    get_all_url_stats_handler,
     get_list_url_stats_handler,
+    get_one_url_stats_handler,
+    update_list_url_stats_handler,
+    update_url_stats_handler,
 )
 from src.models.base import ManyCustomResponse
 from src.models.url.entity import UrlModel
@@ -58,6 +69,21 @@ def _mock_handler(return_value=None, side_effect=None):
 
 
 class TestRedirectToUrl:
+    async def test_redirect_returns_none(self, app: FastAPI, client: AsyncClient):
+        mock_get = _mock_handler(return_value=None)
+        mock_stats = _mock_handler()
+
+        app.dependency_overrides[get_one_url_handler] = lambda: mock_get
+        app.dependency_overrides[create_url_stats_handler] = lambda: mock_stats
+
+        response = await client.get(
+            "/v0/shortner/", params={"short_code": "abc123"}, follow_redirects=False
+        )
+
+        assert response.status_code == 302
+        assert response.headers["location"] == "/"
+        mock_stats.handle.assert_not_awaited()
+
     async def test_redirect_success(self, app: FastAPI, client: AsyncClient):
         mock_get = _mock_handler(return_value=SAMPLE_URL)
         mock_stats = _mock_handler(return_value=None)
@@ -304,3 +330,5 @@ class TestDeleteShortUrl:
         assert response.status_code == 404
         body = response.json()
         assert body["errors"][0]["type"] == "NOT_FOUND"
+
+
