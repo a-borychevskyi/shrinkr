@@ -2,6 +2,7 @@ from typing import Annotated
 
 from fastapi import Depends
 
+from handlers.orm.url import MarkAsActiveUrlHandler
 from src.di.orm.database import get_uow
 from src.di.repositories.url import get_url_repository
 from src.handlers.orm.url import (
@@ -51,6 +52,11 @@ def update_url_handler(uow: Annotated[UnitOfWork, Depends(get_uow)]):
 def update_list_url_handler(uow: Annotated[UnitOfWork, Depends(get_uow)]):
     url_repository = get_url_repository()
     return UpdateListUrlHandler(url_repository=url_repository, uow=uow)
+
+
+def mark_as_active_url_handler(uow: Annotated[UnitOfWork, Depends(get_uow)]):
+    url_repository = get_url_repository()
+    return MarkAsActiveUrlHandler(url_repository=url_repository, uow=uow)
 
 
 def mark_as_deleted_url_handler(uow: Annotated[UnitOfWork, Depends(get_uow)]):

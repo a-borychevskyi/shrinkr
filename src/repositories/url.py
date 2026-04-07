@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from secrets import token_urlsafe
-from typing import Sequence
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,9 +16,7 @@ class UrlRepository(DatabaseRepository):
     __model__ = Url
 
     @staticmethod
-    def get_short_code(model: UrlModel) -> str:
-        if model.short_code:
-            return model.short_code
+    def get_short_code() -> str:
         return token_urlsafe(12)
 
     async def get_one(
@@ -39,13 +36,13 @@ class UrlRepository(DatabaseRepository):
         sorters: UrlSortModel,
         page: int = 1,
         per_page: int = 10,
-    ) -> ManyCustomResponse[Url]:
-        results = await super().get_list(
+    ) -> ManyCustomResponse[UrlModel]:
+        count, data = await super().get_list(
             async_session, filters, sorters, page, per_page
         )
-        return ManyCustomResponse[Url](
-            count=results.count,
-            data=[UrlModel.model_validate(result) for result in results.data],
+        return ManyCustomResponse[UrlModel](
+            count=count,
+            data=[UrlModel.model_validate(result) for result in data],
         )
 
     async def get_all(

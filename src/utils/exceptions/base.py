@@ -1,4 +1,4 @@
-from src.models.errors.entity import ServiceErrorModel, ErrorModel
+from src.models.errors.entity import ErrorModel, ServiceErrorModel
 
 
 class BaseApplicationException(Exception):

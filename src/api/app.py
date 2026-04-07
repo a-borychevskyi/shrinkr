@@ -2,9 +2,9 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from src.api.exceptions import ExceptionHandler
 from src.api.v0 import v0_router
 from src.di.orm.database import get_db
-from src.api.exceptions import ExceptionHandler
 
 
 @asynccontextmanager

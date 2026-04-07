@@ -1,5 +1,3 @@
-from typing import Sequence
-
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.models.base import ManyCustomResponse
@@ -10,8 +8,8 @@ from src.orm.sorters.url_stats import UrlStatsSortModel
 from src.repositories.base import DatabaseRepository
 
 
-class UrlStatsRepository[Model: UrlStats](DatabaseRepository):
-    __model__ = Model
+class UrlStatsRepository(DatabaseRepository):
+    __model__ = UrlStats
 
     async def get_one(
         self,
@@ -28,13 +26,13 @@ class UrlStatsRepository[Model: UrlStats](DatabaseRepository):
         sorters: UrlStatsSortModel,
         page: int = 1,
         per_page: int = 10,
-    ) -> ManyCustomResponse[UrlStats]:
-        results = await super().get_list(
+    ) -> ManyCustomResponse[UrlStatsModel]:
+        count, data = await super().get_list(
             async_session, filters, sorters, page, per_page
         )
-        return ManyCustomResponse[UrlStats](
-            count=results.count,
-            data=[UrlStatsModel.model_validate(result) for result in results.data],
+        return ManyCustomResponse[UrlStatsModel](
+            count=count,
+            data=[UrlStatsModel.model_validate(result) for result in data],
         )
 
     async def get_all(
@@ -49,7 +47,7 @@ class UrlStatsRepository[Model: UrlStats](DatabaseRepository):
     async def create(
         self,
         async_session: AsyncSession,
-        model: UrlStats,
+        model: UrlStatsModel,
     ) -> UrlStatsModel:
         result = await super().create(async_session, model)
         return UrlStatsModel.model_validate(result)

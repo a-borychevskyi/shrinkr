@@ -1,10 +1,14 @@
 from datetime import UTC, datetime
-from secrets import token_urlsafe
 
+from loguru import logger
+
+from src.models.base import ManyCustomResponse
 from src.models.url.entity import UrlModel
 from src.orm.filters.url import UrlFilter
+from src.orm.sorters.url import UrlSortModel
 from src.repositories.uow import UnitOfWork
 from src.repositories.url import UrlRepository
+from src.utils.exceptions.base import NotFound
 from src.utils.types.type_variables import FilterModelT
 
 
@@ -13,13 +17,18 @@ class GetOneUrlHandler:
         self.url_repository = url_repository
         self.uow = uow
 
-    async def handle(self, filters: FilterModelT):
+    async def handle(self, filters: FilterModelT) -> UrlModel | None:
         async with self.uow as uow:
             session = uow.session
 
-            return await self.url_repository.get_one(
+            response = await self.url_repository.get_one(
                 filters=filters, async_session=session
             )
+            if not response:
+                logger.warning(f"Url not found for filters: {filters}")
+                raise NotFound(message="Url not found")
+
+            return response
 
 
 class GetListUrlHandler:
@@ -27,12 +36,16 @@ class GetListUrlHandler:
         self.url_repository = url_repository
         self.uow = uow
 
-    async def handle(self, filters: FilterModelT):
+    async def handle(
+            self, filters: UrlFilter, sorters: UrlSortModel
+    ) -> ManyCustomResponse[UrlModel]:
         async with self.uow as uow:
             session = uow.session
 
             return await self.url_repository.get_list(
-                filters=filters, async_session=session
+                filters=filters,
+                async_session=session,
+                sorters=sorters or UrlSortModel(),
             )
 
 
@@ -41,11 +54,15 @@ class GetAllUrlHandler:
         self.url_repository = url_repository
         self.uow = uow
 
-    async def handle(self):
+    async def handle(self, sorters: UrlSortModel) -> list[UrlModel]:
         async with self.uow as uow:
             session = uow.session
 
-            return await self.url_repository.get_all(async_session=session)
+            return await self.url_repository.get_all(
+                async_session=session,
+                filters=UrlFilter(),
+                sorters=sorters or UrlSortModel(),
+            )
 
 
 class CreateUrlHandler:
@@ -53,14 +70,23 @@ class CreateUrlHandler:
         self.url_repository = url_repository
         self.uow = uow
 
-    async def handle(self, model):
+    async def handle(self, target_url: str) -> UrlModel:
         async with self.uow as uow:
             session = uow.session
 
+            while True:
+                short_code = self.url_repository.get_short_code()
+                search_response = await self.url_repository.get_one(
+                    filters=UrlFilter(short_code=short_code), async_session=session
+                )
+
+                if not search_response:
+                    break
+
             model_to_create = UrlModel(
                 id=None,
-                target_url=model.target_url,
-                short_code=self.url_repository.get_short_code(model=model),
+                target_url=target_url,
+                short_code=self.url_repository.get_short_code(),
                 created_at=None,
                 updated_at=None,
                 deleted_at=None,
@@ -76,12 +102,24 @@ class CreateListUrlHandler:
         self.url_repository = url_repository
         self.uow = uow
 
-    async def handle(self, models):
+    async def handle(self, target_urls: list[str]) -> int:
         async with self.uow as uow:
             session = uow.session
 
+            models_to_create = [
+                UrlModel(
+                    id=None,
+                    target_url=url,
+                    short_code=self.url_repository.get_short_code(),
+                    created_at=None,
+                    updated_at=None,
+                    deleted_at=None,
+                )
+                for url in target_urls
+            ]
+
             return await self.url_repository.create_list(
-                models=models, async_session=session
+                models=models_to_create, async_session=session
             )
 
 
@@ -90,7 +128,7 @@ class UpdateUrlHandler:
         self.url_repository = url_repository
         self.uow = uow
 
-    async def handle(self, model):
+    async def handle(self, model: UrlModel) -> UrlModel:
         async with self.uow as uow:
             session = uow.session
 
@@ -104,7 +142,7 @@ class UpdateListUrlHandler:
         self.url_repository = url_repository
         self.uow = uow
 
-    async def handle(self, models):
+    async def handle(self, models: list[UrlModel]) -> int:
         async with self.uow as uow:
             session = uow.session
 
@@ -118,18 +156,40 @@ class MarkAsDeletedUrlHandler:
         self.url_repository = url_repository
         self.uow = uow
 
-    async def handle(self, short_code: str):
+    async def handle(self, short_code: str) -> UrlModel | None:
         async with self.uow as uow:
             session = uow.session
 
-            filters = UrlFilter(short_code=short_code)
+            filters = UrlFilter(short_code=short_code, deleted_at__is_null=True)
             model = await self.url_repository.get_one(
                 filters=filters, async_session=session
             )
-            if not model or model.deleted_at:
+            if not model:
                 return None
 
             model.deleted_at = datetime.now(UTC).replace(tzinfo=None)
+            return await self.url_repository.update_one(
+                model=model, async_session=session
+            )
+
+
+class MarkAsActiveUrlHandler:
+    def __init__(self, url_repository: UrlRepository, uow: UnitOfWork):
+        self.url_repository = url_repository
+        self.uow = uow
+
+    async def handle(self, short_code: str) -> UrlModel | None:
+        async with self.uow as uow:
+            session = uow.session
+
+            filters = UrlFilter(short_code=short_code, deleted_at__is_not_null=True)
+            model = await self.url_repository.get_one(
+                filters=filters, async_session=session
+            )
+            if not model:
+                return None
+
+            model.deleted_at = None
             return await self.url_repository.update_one(
                 model=model, async_session=session
             )
@@ -140,9 +200,16 @@ class DeleteUrlHandler:
         self.url_repository = url_repository
         self.uow = uow
 
-    async def handle(self, model):
+    async def handle(self, short_code: str) -> int:
         async with self.uow as uow:
             session = uow.session
+
+            filters = UrlFilter(short_code=short_code)
+            model = await self.url_repository.get_one(
+                filters=filters, async_session=session
+            )
+            if not model:
+                raise NotFound(message="Url not found")
 
             return await self.url_repository.delete_one(
                 model=model, async_session=session

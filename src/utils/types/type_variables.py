@@ -1,6 +1,6 @@
 from typing import TypeVar
 
-from src.models.base import BaseEntityModel, PydanticOrmModel
+from src.models.base import PydanticOrmModel
 from src.orm.filters.base import BaseFilterModel
 from src.orm.sorters.base import BaseSortModel
 

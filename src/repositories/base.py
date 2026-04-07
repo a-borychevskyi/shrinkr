@@ -7,7 +7,6 @@ from sqlalchemy import ColumnExpressionArgument, delete, func, insert, select, u
 from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.models.base import ManyCustomResponse
 from src.orm.models.base import Base
 from src.utils.types.type_variables import (
     CreateModelT,
@@ -40,7 +39,7 @@ class DatabaseRepository[AbstractModel: Base]:
         sorters: SortModelT,
         page: int = 1,
         per_page: int = 10,
-    ) -> ManyCustomResponse[AbstractModel]:
+    ) -> tuple[int, list[AbstractModel]]:
         sql = filters.generate_filtered_query(expression=select(self.__model__))
         result = await async_session.execute(
             sql.order_by(*sorters.generate_params())
@@ -51,9 +50,9 @@ class DatabaseRepository[AbstractModel: Base]:
         count_result = await async_session.execute(
             statement=select(func.count()).select_from(sql.subquery())
         )
-        count = count_result.scalar()
+        count = count_result.scalar() or 0
 
-        return ManyCustomResponse[self.__model__](count=count, data=data)  # type: ignore[name-defined]
+        return count, data
 
     async def get_all(
         self,
