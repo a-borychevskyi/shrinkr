@@ -20,6 +20,9 @@ def get_client_ip(request: Request) -> str:
     Returns:
         The client IP address as a string, or "unknown".
     """
+    # TODO(andrii): restrict to trusted proxies before production —
+    # without a trusted_hosts list, clients can spoof X-Forwarded-For
+    # to bypass IP-based rate limiting.
     forwarded_for = request.headers.get("x-forwarded-for", "")
     if forwarded_for:
         ip = forwarded_for.split(",")[0].strip()

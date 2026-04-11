@@ -14,6 +14,14 @@ from src.utils.exceptions.rate_limit import RateLimitExceeded
 tracer = trace.get_tracer(__name__)
 
 LUA_SCRIPT = """
+-- Sliding window counter rate limit.
+-- KEYS[1]: current window key
+-- KEYS[2]: previous window key
+-- ARGV[1]: limit (integer)
+-- ARGV[2]: window size in seconds (integer)
+-- ARGV[3]: current unix timestamp (integer)
+-- Returns: {allowed (0|1), remaining (integer), reset_at (unix timestamp)}
+
 local current_key = KEYS[1]
 local previous_key = KEYS[2]
 local limit = tonumber(ARGV[1])
@@ -32,8 +40,10 @@ if estimate >= limit then
     return {0, 0, reset_at}
 end
 
-redis.call('INCR', current_key)
-redis.call('EXPIRE', current_key, window * 2)
+local new_val = redis.call('INCR', current_key)
+if new_val == 1 then
+    redis.call('EXPIRE', current_key, window * 2)
+end
 
 local new_count = current_count + 1
 local new_estimate = prev_count * (1 - elapsed / window) + new_count
@@ -61,14 +71,19 @@ class RateLimiter:
 
     Args:
         times: Maximum number of requests allowed per window. When ``None``
-            the value is read from ``RATE_LIMIT_DEFAULT_TIMES`` at call time.
+            the value is read from ``RATE_LIMIT_DEFAULT_TIMES`` at init time.
         seconds: Window size in seconds. When ``None`` the value is read from
-            ``RATE_LIMIT_DEFAULT_WINDOW`` at call time.
+            ``RATE_LIMIT_DEFAULT_WINDOW`` at init time.
     """
 
     def __init__(self, times: int | None = None, seconds: int | None = None) -> None:
-        self._times = times
-        self._seconds = seconds
+        config = RateLimiterConfig()
+        self._enabled = config.RATE_LIMIT_ENABLED
+        self._times = times if times is not None else config.RATE_LIMIT_DEFAULT_TIMES
+        self._seconds = (
+            seconds if seconds is not None else config.RATE_LIMIT_DEFAULT_WINDOW
+        )
+        self._key_prefix = f"{config.APP_PREFIX}:{config.RATE_LIMIT_KEY_PREFIX}"
 
     async def __call__(
         self,
@@ -76,34 +91,8 @@ class RateLimiter:
         response: Response,
         redis: Annotated[Redis, Depends(get_async_redis_client)],
     ) -> None:
-        """Apply the rate limit to the current request.
-
-        Sets ``X-RateLimit-Limit``, ``X-RateLimit-Remaining``, and
-        ``X-RateLimit-Reset`` response headers regardless of outcome.
-        Raises ``RateLimitExceeded`` (HTTP 429) when the limit is breached.
-
-        Args:
-            request: The incoming FastAPI request.
-            response: The outgoing FastAPI response (headers are mutated).
-            redis: An async Redis client injected via FastAPI DI.
-
-        Raises:
-            RateLimitExceeded: When the sliding-window estimate exceeds the
-                configured limit for the client IP + route combination.
-        """
-        config = RateLimiterConfig()
-
-        if not config.RATE_LIMIT_ENABLED:
+        if not self._enabled:
             return
-
-        times = (
-            self._times if self._times is not None else config.RATE_LIMIT_DEFAULT_TIMES
-        )
-        seconds = (
-            self._seconds
-            if self._seconds is not None
-            else config.RATE_LIMIT_DEFAULT_WINDOW
-        )
 
         client_ip = get_client_ip(request)
 
@@ -111,19 +100,19 @@ class RateLimiter:
         route_pattern: str = route.path if route else request.url.path
 
         now = int(time.time())
-        window_start = now - (now % seconds)
-        prev_window_start = window_start - seconds
-
-        prefix = f"{config.APP_PREFIX}:{config.RATE_LIMIT_KEY_PREFIX}"
-        current_key = f"{prefix}:{client_ip}:{route_pattern}:{window_start}"
-        previous_key = f"{prefix}:{client_ip}:{route_pattern}:{prev_window_start}"
+        window_start = now - (now % self._seconds)
+        prev_window_start = window_start - self._seconds
+        current_key = f"{self._key_prefix}:{client_ip}:{route_pattern}:{window_start}"
+        previous_key = (
+            f"{self._key_prefix}:{client_ip}:{route_pattern}:{prev_window_start}"
+        )
 
         with tracer.start_as_current_span(
             "rate_limit.check",
             attributes={
                 "rate_limit.client_ip": client_ip,
                 "rate_limit.route": route_pattern,
-                "rate_limit.limit": times,
+                "rate_limit.limit": self._times,
             },
         ) as span:
             result = await redis.eval(
@@ -131,8 +120,8 @@ class RateLimiter:
                 2,
                 current_key,
                 previous_key,
-                str(times),
-                str(seconds),
+                str(self._times),
+                str(self._seconds),
                 str(now),
             )
 
@@ -145,7 +134,7 @@ class RateLimiter:
             span.set_attribute("rate_limit.allowed", bool(allowed))
             span.set_attribute("rate_limit.remaining", remaining)
 
-            response.headers["X-RateLimit-Limit"] = str(times)
+            response.headers["X-RateLimit-Limit"] = str(self._times)
             response.headers["X-RateLimit-Remaining"] = str(remaining)
             response.headers["X-RateLimit-Reset"] = str(reset_at)
 
@@ -155,13 +144,13 @@ class RateLimiter:
                     "Rate limit exceeded: ip={} route={} limit={}/{}s",
                     client_ip,
                     route_pattern,
-                    times,
-                    seconds,
+                    self._times,
+                    self._seconds,
                 )
                 raise RateLimitExceeded(
                     retry_after=retry_after,
                     headers={
-                        "X-RateLimit-Limit": str(times),
+                        "X-RateLimit-Limit": str(self._times),
                         "X-RateLimit-Remaining": "0",
                         "X-RateLimit-Reset": str(reset_at),
                     },
