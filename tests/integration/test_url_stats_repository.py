@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.models.url.entity import UrlModel
 from src.models.url_stats.entity import UrlStatsModel
 from src.orm.filters.url_stats import UrlStatsFilter
-from src.orm.models import Url
+from src.orm.models import Url, UrlStats
 from src.orm.sorters.url_stats import UrlStatsSortModel
 from src.repositories.url import UrlRepository
 from src.repositories.url_stats import UrlStatsRepository
@@ -101,3 +101,28 @@ async def test_stats_filter_by_ip(
         sorters=UrlStatsSortModel(),
     )
     assert count == 2
+
+
+async def test_update_many(
+    async_session: AsyncSession,
+    url_repo: UrlRepository,
+    stats_repo: UrlStatsRepository,
+):
+    url = await _create_url(async_session, url_repo, "updmany1")
+
+    models = [
+        UrlStatsModel(url_id=url.id, user_agent=f"Agent-{i}", ip_address="10.0.0.1")
+        for i in range(2)
+    ]
+    for m in models:
+        await stats_repo.create(async_session=async_session, model=m)
+
+    update_model = UrlStatsModel(
+        url_id=url.id, user_agent="Updated-Agent", ip_address="10.0.0.1"
+    )
+    updated_count = await stats_repo.update_many(
+        UrlStats.url_id == url.id,
+        async_session=async_session,
+        models=[update_model],
+    )
+    assert updated_count == 2

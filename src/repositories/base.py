@@ -114,11 +114,10 @@ class BaseDatabaseRepository(Generic[ModelT, FilterT, SortT, SchemaT]):
         async_session: AsyncSession,
         models: Sequence[SchemaT],
     ):
-        sql = (
-            update(self.__model__)
-            .where(*clauses)
-            .values([model.to_orm() for model in models])
-        )
+        merged: dict[str, Any] = {}
+        for model in models:
+            merged.update(model.to_orm())
+        sql = update(self.__model__).where(*clauses).values(**merged)
         return cast(
             CursorResult[Any], await async_session.execute(statement=sql)
         ).rowcount

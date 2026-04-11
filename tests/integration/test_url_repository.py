@@ -112,3 +112,25 @@ async def test_create_duplicate_short_code_raises(
 async def test_get_short_code_generates_unique_codes(url_repo: UrlRepository):
     codes = {url_repo.get_short_code() for _ in range(100)}
     assert len(codes) == 100
+
+
+async def test_get_all(async_session: AsyncSession, url_repo: UrlRepository):
+    for i in range(3):
+        model = UrlModel(target_url=f"https://all-test.com/{i}", short_code=f"all{i}")
+        await url_repo.create(async_session=async_session, model=model)
+
+    results = await url_repo.get_all(
+        async_session=async_session,
+        filters=UrlFilter(),
+        sorters=UrlSortModel(),
+    )
+    assert len(results) >= 3
+
+
+async def test_create_many(async_session: AsyncSession, url_repo: UrlRepository):
+    models = [
+        UrlModel(target_url=f"https://batch.com/{i}", short_code=f"batch{i}")
+        for i in range(3)
+    ]
+    count = await url_repo.create_many(async_session=async_session, models=models)
+    assert count == 3
