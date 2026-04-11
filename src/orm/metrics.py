@@ -1,10 +1,12 @@
 import re
 import time
 
-from loguru import logger
+import structlog
 from opentelemetry import metrics
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
+
+logger = structlog.get_logger(__name__)
 
 _OPERATION_RE = re.compile(r"^\s*(SELECT|INSERT|UPDATE|DELETE|WITH)\b", re.IGNORECASE)
 _TABLE_RE = re.compile(r"(?:FROM|INTO|UPDATE|JOIN)\s+([\"']?\w+[\"']?)", re.IGNORECASE)
@@ -61,11 +63,11 @@ def register_query_metrics(engine: Engine) -> None:
         sql_query_duration.record(elapsed, attributes=attrs)
         sql_query_total.add(1, attributes=attrs)
         logger.info(
-            "sql_query operation={op} table={tbl} duration={dur:.6f}s query={q}",
-            op=operation,
-            tbl=table,
-            dur=elapsed,
-            q=statement.replace("\n", " ").strip(),
+            "sql_query",
+            operation=operation,
+            table=table,
+            duration=round(elapsed, 6),
+            query=statement.replace("\n", " ").strip(),
         )
 
     @event.listens_for(engine, "handle_error")
@@ -75,9 +77,9 @@ def register_query_metrics(engine: Engine) -> None:
         table = _parse_table(statement)
         sql_query_errors.add(1, attributes={"operation": operation, "table": table})
         logger.error(
-            "sql_query_error operation={op} table={tbl} error={err} query={q}",
-            op=operation,
-            tbl=table,
-            err=str(exception_context.original_exception),
-            q=statement.replace("\n", " ").strip(),
+            "sql_query_error",
+            operation=operation,
+            table=table,
+            error=str(exception_context.original_exception),
+            query=statement.replace("\n", " ").strip(),
         )

@@ -1,4 +1,4 @@
-from loguru import logger
+import structlog
 from opentelemetry import trace
 
 from src.models.base import ManyCustomResponse
@@ -12,6 +12,7 @@ from src.repositories.url import UrlRepository
 from src.repositories.url_stats import UrlStatsRepository
 from src.utils.exceptions.base import NotFound
 
+logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer(__name__)
 
 
@@ -36,7 +37,7 @@ class UrlStatsService:
                     filters=filters, async_session=uow.session
                 )
                 if not url:
-                    logger.warning(f"Url not found for filters: {filters}")
+                    logger.warning("url_not_found", filters=str(filters))
                     raise NotFound(message="Url not found")
 
                 result = await self.url_stats_repository.get_one(
@@ -60,7 +61,7 @@ class UrlStatsService:
                     filters=filters, async_session=uow.session
                 )
                 if not url:
-                    logger.warning(f"Url not found for filters: {filters}")
+                    logger.warning("url_not_found", filters=str(filters))
                     raise NotFound(message="Url not found")
 
                 count, data = await self.url_stats_repository.get_list(

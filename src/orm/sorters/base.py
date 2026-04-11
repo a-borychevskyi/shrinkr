@@ -1,10 +1,12 @@
 from typing import Type
 
-from loguru import logger
+import structlog
 from sqlalchemy import TextClause, text
 
 from src.models.base import BaseEntityModel
 from src.utils.enums.sort import SortOption
+
+logger = structlog.get_logger(__name__)
 
 
 class BaseSortModel(BaseEntityModel):
@@ -28,7 +30,7 @@ class BaseSortModel(BaseEntityModel):
 
         for name, value in self.model_dump(exclude_unset=True).items():
             if not self.validate_sort_option(name, value):
-                logger.warning(f"Invalid sort option: {name} {value}")
+                logger.warning("invalid_sort_option", name=name, value=value)
                 continue
 
             order_by.append(text(f"{name} {value}"))

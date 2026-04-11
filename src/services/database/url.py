@@ -1,6 +1,6 @@
 from datetime import UTC, datetime
 
-from loguru import logger
+import structlog
 from opentelemetry import trace
 
 from src.models.base import ManyCustomResponse
@@ -12,6 +12,7 @@ from src.repositories.uow import UnitOfWork
 from src.repositories.url import UrlRepository
 from src.utils.exceptions.base import NotFound
 
+logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer(__name__)
 
 
@@ -30,7 +31,7 @@ class UrlService:
                     filters=filters, async_session=uow.session
                 )
                 if not result:
-                    logger.warning(f"Url not found for filters: {filters}")
+                    logger.warning("url_not_found", filters=str(filters))
                     raise NotFound(message="Url not found")
                 return UrlModel.model_validate(result)
 

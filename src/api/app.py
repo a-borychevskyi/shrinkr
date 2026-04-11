@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from src.api.exceptions import ExceptionHandler
 from src.api.v0 import v0_router
 from src.di.orm.database import get_db
+from src.logging import setup_logging
 from src.telemetry import instrument_app, setup_telemetry
 
 
@@ -16,6 +17,7 @@ async def lifespan(app: FastAPI):
 
 
 def create_app() -> FastAPI:
+    setup_logging()
     setup_telemetry()
 
     app = FastAPI(

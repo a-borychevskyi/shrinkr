@@ -3,8 +3,8 @@ from __future__ import annotations
 from abc import ABC
 from typing import Any, Generic, Sequence, Type, TypeVar, cast
 
-from loguru import logger
 import orjson
+import structlog
 from redis.asyncio import Redis
 from sqlalchemy import ColumnExpressionArgument, delete, func, insert, select, update
 from sqlalchemy.engine import CursorResult
@@ -17,6 +17,8 @@ from src.orm.filters.base import BaseFilterModel
 from src.orm.models.base import Base
 from src.orm.sorters.base import BaseSortModel
 from src.utils.exceptions.base import BaseApplicationException
+
+logger = structlog.get_logger(__name__)
 
 ModelT = TypeVar("ModelT", bound=Base)
 FilterT = TypeVar("FilterT", bound=BaseFilterModel)
@@ -36,7 +38,7 @@ class BaseDatabaseRepository(Generic[ModelT, FilterT, SortT, SchemaT]):
         result = await async_session.execute(statement=sql)
         if not (orm_model := result.scalar_one_or_none()):
             message = f"Unable to get: does not have any records for sql: {sql} by provided filters: {filters}"
-            logger.warning(message)
+            logger.warning("record_not_found", detail=message)
             return None
         return orm_model
 

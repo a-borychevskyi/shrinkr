@@ -4,7 +4,7 @@ import time
 from secrets import token_urlsafe
 
 import orjson
-from loguru import logger
+import structlog
 from opentelemetry import trace
 
 from src.models.url.entity import UrlModel
@@ -17,6 +17,7 @@ from src.repositories.metrics import (
     cache_operations_total,
 )
 
+logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer(__name__)
 
 
@@ -44,14 +45,14 @@ class UrlCacheRepository(StringAbstractRepository[UrlModel]):
             )
 
             if not retrieved:
-                logger.debug(f"Cache miss for short code: {short_code}")
+                logger.debug("cache_miss", short_code=short_code)
                 span.set_attribute("cache.hit", False)
                 cache_operations_total.add(
                     1, attributes={"operation": "get", "result": "miss"}
                 )
                 return None
 
-            logger.debug(f"Cache hit for short code: {short_code}")
+            logger.debug("cache_hit", short_code=short_code)
             span.set_attribute("cache.hit", True)
             cache_operations_total.add(
                 1, attributes={"operation": "get", "result": "hit"}
@@ -65,7 +66,7 @@ class UrlCacheRepository(StringAbstractRepository[UrlModel]):
             "cache.set",
             attributes={"cache.key": short_code, "cache.ttl_seconds": ttl},
         ):
-            logger.debug(f"Cache set for short code: {short_code}")
+            logger.debug("cache_set", short_code=short_code)
             start = time.perf_counter()
             result = await super()._set_value(
                 short_code, orjson.dumps(url.model_dump()).decode(), ex=ttl
@@ -84,7 +85,7 @@ class UrlCacheRepository(StringAbstractRepository[UrlModel]):
             "cache.delete",
             attributes={"cache.key": short_code},
         ):
-            logger.debug(f"Cache delete for short code: {short_code}")
+            logger.debug("cache_delete", short_code=short_code)
             start = time.perf_counter()
             result = await super()._delete_by_key(short_code)
             elapsed = time.perf_counter() - start

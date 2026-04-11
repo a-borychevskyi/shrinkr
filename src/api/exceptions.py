@@ -1,12 +1,14 @@
+import structlog
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-from loguru import logger
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from src.models.errors.entity import ErrorModel, ServiceErrorModel
 from src.utils.exceptions.base import BaseApplicationException
 from src.utils.exceptions.rate_limit import RateLimitExceeded
+
+logger = structlog.get_logger(__name__)
 
 
 def _error_response_to_dict(error_response: ServiceErrorModel) -> dict:
@@ -49,7 +51,7 @@ class ExceptionHandler:
         async def validation_exception_handler(
             request: Request, exc: RequestValidationError
         ) -> JSONResponse:
-            logger.warning(f"Validation error: {exc}")
+            logger.warning("validation_error", detail=str(exc))
             return JSONResponse(
                 status_code=422,
                 content=_error_response_to_dict(
@@ -61,7 +63,7 @@ class ExceptionHandler:
         async def http_exception_handler(
             request: Request, exc: StarletteHTTPException
         ) -> JSONResponse:
-            logger.warning(f"HTTP error: {exc.status_code} {exc.detail}")
+            logger.warning("http_error", status_code=exc.status_code, detail=exc.detail)
             error_type = "NOT_FOUND" if exc.status_code == 404 else "HTTP_ERROR"
             return JSONResponse(
                 status_code=exc.status_code,
@@ -82,7 +84,7 @@ class ExceptionHandler:
         async def rate_limit_exception_handler(
             request: Request, exc: RateLimitExceeded
         ) -> JSONResponse:
-            logger.warning(f"Rate limit exceeded: {exc}")
+            logger.warning("rate_limit_exceeded", detail=str(exc))
             return JSONResponse(
                 status_code=exc.status_code,
                 content=_error_response_to_dict(exc.to_error_response()),
@@ -93,7 +95,7 @@ class ExceptionHandler:
         async def application_exception_handler(
             request: Request, exc: BaseApplicationException
         ) -> JSONResponse:
-            logger.warning(f"Application error: {exc}")
+            logger.warning("application_error", detail=str(exc))
             return JSONResponse(
                 status_code=exc.status_code,
                 content=_error_response_to_dict(exc.to_error_response()),
@@ -103,7 +105,7 @@ class ExceptionHandler:
         async def global_exception_handler(
             request: Request, exc: Exception
         ) -> JSONResponse:
-            logger.error(f"Unhandled exception: {exc}")
+            logger.error("unhandled_exception", detail=str(exc), exc_info=exc)
             fallback = BaseApplicationException(str(exc))
             return JSONResponse(
                 status_code=500,
