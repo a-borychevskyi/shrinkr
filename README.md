@@ -140,6 +140,22 @@ src/
 
 **Unit of Work** — Database sessions are wrapped in a UoW context manager to guarantee transactional consistency across multiple repository calls.
 
+## Development
+
+```bash
+# Install all dependencies including dev tools
+uv sync --group dev
+
+# Set up pre-commit hooks (ruff format, ruff check, mypy)
+uv run pre-commit install
+```
+
+Pre-commit hooks run automatically on every `git commit`. To run them manually against all files:
+
+```bash
+uv run pre-commit run --all-files
+```
+
 ## Testing
 
 ```bash

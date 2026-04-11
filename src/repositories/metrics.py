@@ -1,4 +1,4 @@
-from opentelemetry import metrics
+from opentelemetry import metrics  # type: ignore[attr-defined]
 
 meter = metrics.get_meter(__name__)
 
