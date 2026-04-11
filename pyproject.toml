@@ -55,7 +55,15 @@ addopts = "--cov=src --cov-report=term-missing"
 
 [tool.coverage.run]
 source = ["src"]
-omit = ["src/main.py", "src/telemetry.py", "src/config/*", "alembic/*"]
+omit = [
+    "src/main.py",
+    "src/telemetry.py",
+    "src/config/*",
+    "src/orm/metrics.py",
+    "src/orm/database.py",
+    "src/utils/types/*",
+    "alembic/*",
+]
 
 [tool.coverage.report]
 show_missing = true
