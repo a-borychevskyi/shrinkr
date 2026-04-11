@@ -39,7 +39,7 @@
       },
       "targets": [
         {
-          "expr": "sum(increase(http_server_request_duration_seconds_count[5m]))",
+          "expr": "sum(increase(http_server_duration_milliseconds_count[5m]))",
           "legendFormat": "Requests"
         }
       ]
@@ -72,7 +72,7 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(http_server_request_duration_seconds_count{http_response_status_code=~\"5..\"}[5m])) / sum(rate(http_server_request_duration_seconds_count[5m]))",
+          "expr": "sum(rate(http_server_duration_milliseconds_count{http_status_code=~\"5..\"}[5m])) / sum(rate(http_server_duration_milliseconds_count[5m]))",
           "legendFormat": "Error Rate"
         }
       ]
@@ -87,11 +87,11 @@
           "thresholds": {
             "steps": [
               { "color": "green", "value": null },
-              { "color": "yellow", "value": 0.3 },
-              { "color": "red", "value": 1 }
+              { "color": "yellow", "value": 300 },
+              { "color": "red", "value": 1000 }
             ]
           },
-          "unit": "s"
+          "unit": "ms"
         },
         "overrides": []
       },
@@ -103,7 +103,7 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(http_server_request_duration_seconds_sum[5m])) / sum(rate(http_server_request_duration_seconds_count[5m]))",
+          "expr": "sum(rate(http_server_duration_milliseconds_sum[5m])) / sum(rate(http_server_duration_milliseconds_count[5m]))",
           "legendFormat": "Avg Latency"
         }
       ]
@@ -174,8 +174,8 @@
       },
       "targets": [
         {
-          "expr": "sum by (http_response_status_code) (rate(http_server_request_duration_seconds_count[1m]))",
-          "legendFormat": "{{http_response_status_code}}"
+          "expr": "sum by (http_status_code) (rate(http_server_duration_milliseconds_count[1m]))",
+          "legendFormat": "{{http_status_code}}"
         }
       ]
     },
@@ -191,7 +191,7 @@
             "lineInterpolation": "smooth",
             "fillOpacity": 10
           },
-          "unit": "s"
+          "unit": "ms"
         },
         "overrides": [
           {
@@ -214,15 +214,15 @@
       },
       "targets": [
         {
-          "expr": "histogram_quantile(0.50, sum by (le) (rate(http_server_request_duration_seconds_bucket[5m])))",
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(http_server_duration_milliseconds_bucket[5m])))",
           "legendFormat": "p50"
         },
         {
-          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_server_request_duration_seconds_bucket[5m])))",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_server_duration_milliseconds_bucket[5m])))",
           "legendFormat": "p95"
         },
         {
-          "expr": "histogram_quantile(0.99, sum by (le) (rate(http_server_request_duration_seconds_bucket[5m])))",
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(http_server_duration_milliseconds_bucket[5m])))",
           "legendFormat": "p99"
         }
       ]
@@ -255,8 +255,8 @@
       },
       "targets": [
         {
-          "expr": "sum by (http_route) (rate(http_server_request_duration_seconds_count[5m]))",
-          "legendFormat": "{{http_route}}"
+          "expr": "sum by (http_target) (rate(http_server_duration_milliseconds_count[5m]))",
+          "legendFormat": "{{http_target}}"
         }
       ]
     },
@@ -272,7 +272,7 @@
             "lineInterpolation": "smooth",
             "fillOpacity": 10
           },
-          "unit": "s"
+          "unit": "ms"
         },
         "overrides": []
       },
@@ -282,8 +282,8 @@
       },
       "targets": [
         {
-          "expr": "sum by (http_route) (rate(http_server_request_duration_seconds_sum[5m])) / sum by (http_route) (rate(http_server_request_duration_seconds_count[5m]))",
-          "legendFormat": "{{http_route}}"
+          "expr": "sum by (http_target) (rate(http_server_duration_milliseconds_sum[5m])) / sum by (http_target) (rate(http_server_duration_milliseconds_count[5m]))",
+          "legendFormat": "{{http_target}}"
         }
       ]
     },
@@ -309,8 +309,8 @@
       },
       "targets": [
         {
-          "expr": "sum by (http_request_method) (increase(http_server_request_duration_seconds_count[1h]))",
-          "legendFormat": "{{http_request_method}}"
+          "expr": "sum by (http_method) (increase(http_server_duration_milliseconds_count[1h]))",
+          "legendFormat": "{{http_method}}"
         }
       ]
     },
@@ -345,8 +345,8 @@
       },
       "targets": [
         {
-          "expr": "topk(10, sum by (http_route, http_response_status_code) (increase(http_server_request_duration_seconds_count{http_response_status_code=~\"[45]..\"}[1h])))",
-          "legendFormat": "{{http_route}} [{{http_response_status_code}}]",
+          "expr": "topk(10, sum by (http_target, http_status_code) (increase(http_server_duration_milliseconds_count{http_status_code=~\"[45]..\"}[1h])))",
+          "legendFormat": "{{http_target}} [{{http_status_code}}]",
           "format": "table",
           "instant": true
         }
@@ -418,6 +418,6 @@
   "timezone": "browser",
   "title": "Shrinkr API",
   "uid": "shrinkr-api",
-  "version": 2,
+  "version": 3,
   "refresh": "10s"
 }
