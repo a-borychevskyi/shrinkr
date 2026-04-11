@@ -116,7 +116,7 @@ class RateLimiter:
                 "rate_limit.limit": self._times,
             },
         ) as span:
-            result = await redis.eval(
+            result = await redis.eval(  # type: ignore[misc]
                 LUA_SCRIPT,
                 2,
                 current_key,
