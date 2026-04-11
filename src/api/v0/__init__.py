@@ -7,9 +7,7 @@ from src.di.rate_limiter import RateLimiter
 
 v0_router = APIRouter(prefix="/v0")
 v0_router.include_router(system_router)
-v0_router.include_router(
-    shortner_url_router, dependencies=[Depends(RateLimiter())]
-)
+v0_router.include_router(shortner_url_router, dependencies=[Depends(RateLimiter())])
 v0_router.include_router(
     shortner_url_stats_router, dependencies=[Depends(RateLimiter())]
 )

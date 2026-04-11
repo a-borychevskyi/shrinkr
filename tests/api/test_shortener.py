@@ -50,9 +50,7 @@ def _mock_service(**methods):
     return svc
 
 
-def _mock_cache_repo(
-    get_by_short_code=None, set_short_code=None, delete_short_code=0
-):
+def _mock_cache_repo(get_by_short_code=None, set_short_code=None, delete_short_code=0):
     repo = AsyncMock()
     repo.get_by_short_code.return_value = get_by_short_code
     repo.set_short_code.return_value = set_short_code
