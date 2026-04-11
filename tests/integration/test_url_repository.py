@@ -1,15 +1,12 @@
 import pytest
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.models.url.entity import UrlModel
 from src.orm.filters.url import UrlFilter
+from src.orm.models import Url
 from src.orm.sorters.url import UrlSortModel
 from src.repositories.url import UrlRepository
-
-
-@pytest.fixture
-def url_repo() -> UrlRepository:
-    return UrlRepository()
 
 
 async def test_create_and_get_one(async_session: AsyncSession, url_repo: UrlRepository):
@@ -71,8 +68,6 @@ async def test_get_list_with_filter(
 
 
 async def test_update(async_session: AsyncSession, url_repo: UrlRepository):
-    from src.orm.models import Url
-
     model = UrlModel(target_url="https://original.com", short_code="upd1")
     created = await url_repo.create(async_session=async_session, model=model)
 
@@ -87,8 +82,6 @@ async def test_update(async_session: AsyncSession, url_repo: UrlRepository):
 
 
 async def test_delete(async_session: AsyncSession, url_repo: UrlRepository):
-    from src.orm.models import Url
-
     model = UrlModel(target_url="https://delete-me.com", short_code="del1")
     created = await url_repo.create(async_session=async_session, model=model)
 
@@ -107,8 +100,6 @@ async def test_delete(async_session: AsyncSession, url_repo: UrlRepository):
 async def test_create_duplicate_short_code_raises(
     async_session: AsyncSession, url_repo: UrlRepository
 ):
-    from sqlalchemy.exc import IntegrityError
-
     model1 = UrlModel(target_url="https://first.com", short_code="dup1")
     await url_repo.create(async_session=async_session, model=model1)
     await async_session.flush()

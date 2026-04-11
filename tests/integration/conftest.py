@@ -11,6 +11,8 @@ from testcontainers.postgres import PostgresContainer
 from testcontainers.redis import RedisContainer
 
 from src.orm.models.base import Base
+from src.repositories.url import UrlRepository
+from src.repositories.url_stats import UrlStatsRepository
 from src.repositories.uow import UnitOfWork
 
 
@@ -76,3 +78,13 @@ async def redis_client(redis_container) -> AsyncIterator[Redis]:
     yield client
     await client.flushdb()
     await client.aclose()
+
+
+@pytest.fixture
+def url_repo() -> UrlRepository:
+    return UrlRepository()
+
+
+@pytest.fixture
+def stats_repo() -> UrlStatsRepository:
+    return UrlStatsRepository()
