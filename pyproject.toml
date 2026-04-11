@@ -53,3 +53,4 @@ fail_under = 70
 
 [tool.mypy]
 files = ["src"]
+plugins = ["pydantic.mypy"]

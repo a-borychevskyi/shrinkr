@@ -1,6 +1,9 @@
+from opentelemetry import trace
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from src.utils.exceptions.database import DatabaseError
+
+tracer = trace.get_tracer(__name__)
 
 
 class UnitOfWork:
@@ -40,9 +43,12 @@ class UnitOfWork:
             raise
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
+        span = trace.get_current_span()
         if exc_type is None:
             await self.commit()
+            span.set_attribute("db.transaction.outcome", "commit")
         else:
             await self.rollback()
+            span.set_attribute("db.transaction.outcome", "rollback")
 
         await self.close()

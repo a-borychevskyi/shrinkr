@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock
 from fastapi import FastAPI
 from httpx import AsyncClient
 
+from src.di.repositories.url import get_url_cache_repository
 from src.di.services.url import get_url_service
 from src.di.services.url_stats import get_url_stats_service
 from src.models.base import ManyCustomResponse
@@ -49,6 +50,16 @@ def _mock_service(**methods):
     return svc
 
 
+def _mock_cache_repo(
+    get_by_short_code=None, set_short_code=None, delete_short_code=0
+):
+    repo = AsyncMock()
+    repo.get_by_short_code.return_value = get_by_short_code
+    repo.set_short_code.return_value = set_short_code
+    repo.delete_short_code.return_value = delete_short_code
+    return repo
+
+
 # --- Redirect endpoint ---
 
 
@@ -56,9 +67,11 @@ class TestRedirectToUrl:
     async def test_redirect_returns_none(self, app: FastAPI, client: AsyncClient):
         mock_url = _mock_service(get_one=None)
         mock_stats = _mock_service()
+        mock_cache = _mock_cache_repo()
 
         app.dependency_overrides[get_url_service] = lambda: mock_url
         app.dependency_overrides[get_url_stats_service] = lambda: mock_stats
+        app.dependency_overrides[get_url_cache_repository] = lambda: mock_cache
 
         response = await client.get(
             "/v0/shortner/", params={"short_code": "abc123"}, follow_redirects=False
@@ -68,12 +81,16 @@ class TestRedirectToUrl:
         assert response.headers["location"] == "/"
         mock_stats.create.assert_not_awaited()
 
-    async def test_redirect_success(self, app: FastAPI, client: AsyncClient):
+    async def test_redirect_cache_miss_falls_back_to_db(
+        self, app: FastAPI, client: AsyncClient
+    ):
         mock_url = _mock_service(get_one=SAMPLE_URL)
         mock_stats = _mock_service(create=None)
+        mock_cache = _mock_cache_repo()
 
         app.dependency_overrides[get_url_service] = lambda: mock_url
         app.dependency_overrides[get_url_stats_service] = lambda: mock_stats
+        app.dependency_overrides[get_url_cache_repository] = lambda: mock_cache
 
         response = await client.get(
             "/v0/shortner/", params={"short_code": "abc123"}, follow_redirects=False
@@ -81,15 +98,39 @@ class TestRedirectToUrl:
 
         assert response.status_code == 302
         assert response.headers["location"] == "https://example.com"
+        mock_cache.get_by_short_code.assert_awaited_once_with("abc123")
         mock_url.get_one.assert_awaited_once()
+        mock_cache.set_short_code.assert_awaited_once()
+        mock_stats.create.assert_awaited_once()
+
+    async def test_redirect_cache_hit_skips_db(self, app: FastAPI, client: AsyncClient):
+        mock_url = _mock_service()
+        mock_stats = _mock_service(create=None)
+        mock_cache = _mock_cache_repo(get_by_short_code=SAMPLE_URL)
+
+        app.dependency_overrides[get_url_service] = lambda: mock_url
+        app.dependency_overrides[get_url_stats_service] = lambda: mock_stats
+        app.dependency_overrides[get_url_cache_repository] = lambda: mock_cache
+
+        response = await client.get(
+            "/v0/shortner/", params={"short_code": "abc123"}, follow_redirects=False
+        )
+
+        assert response.status_code == 302
+        assert response.headers["location"] == "https://example.com"
+        mock_cache.get_by_short_code.assert_awaited_once_with("abc123")
+        mock_url.get_one.assert_not_awaited()
+        mock_cache.set_short_code.assert_not_awaited()
         mock_stats.create.assert_awaited_once()
 
     async def test_redirect_not_found(self, app: FastAPI, client: AsyncClient):
         mock_url = _mock_service(get_one=NotFound(message="Url not found"))
         mock_stats = _mock_service()
+        mock_cache = _mock_cache_repo()
 
         app.dependency_overrides[get_url_service] = lambda: mock_url
         app.dependency_overrides[get_url_stats_service] = lambda: mock_stats
+        app.dependency_overrides[get_url_cache_repository] = lambda: mock_cache
 
         response = await client.get(
             "/v0/shortner/", params={"short_code": "nonexistent"}
@@ -105,9 +146,11 @@ class TestRedirectToUrl:
     ):
         mock_url = _mock_service(get_one=SAMPLE_URL)
         mock_stats = _mock_service(create=None)
+        mock_cache = _mock_cache_repo()
 
         app.dependency_overrides[get_url_service] = lambda: mock_url
         app.dependency_overrides[get_url_stats_service] = lambda: mock_stats
+        app.dependency_overrides[get_url_cache_repository] = lambda: mock_cache
 
         await client.get(
             "/v0/shortner/",
@@ -184,8 +227,10 @@ class TestGetShortUrlStats:
 class TestCreateShortUrl:
     async def test_create_success(self, app: FastAPI, client: AsyncClient):
         mock_svc = _mock_service(create=SAMPLE_URL)
+        mock_cache = _mock_cache_repo()
 
         app.dependency_overrides[get_url_service] = lambda: mock_svc
+        app.dependency_overrides[get_url_cache_repository] = lambda: mock_cache
 
         response = await client.post(
             "/v0/shortner/", json={"target_url": "https://example.com"}
@@ -194,6 +239,7 @@ class TestCreateShortUrl:
         assert response.status_code == 201
         body = response.json()
         assert body["payload"]["short_code"] == "abc123"
+        mock_cache.set_short_code.assert_awaited_once_with("abc123", SAMPLE_URL)
 
     async def test_create_invalid_url(self, client: AsyncClient):
         response = await client.post("/v0/shortner/", json={"target_url": "not-a-url"})
@@ -214,8 +260,10 @@ class TestCreateShortUrl:
 class TestDeactivateShortUrl:
     async def test_deactivate_success(self, app: FastAPI, client: AsyncClient):
         mock_svc = _mock_service(mark_as_deleted=SAMPLE_URL)
+        mock_cache = _mock_cache_repo(delete_short_code=1)
 
         app.dependency_overrides[get_url_service] = lambda: mock_svc
+        app.dependency_overrides[get_url_cache_repository] = lambda: mock_cache
 
         response = await client.post(
             "/v0/shortner/deactivate", json={"short_code": "abc123"}
@@ -224,11 +272,14 @@ class TestDeactivateShortUrl:
         assert response.status_code == 200
         body = response.json()
         assert body["payload"]["message"] == "Short URL deactivated"
+        mock_cache.delete_short_code.assert_awaited_once_with("abc123")
 
     async def test_deactivate_not_found(self, app: FastAPI, client: AsyncClient):
         mock_svc = _mock_service(mark_as_deleted=None)
+        mock_cache = _mock_cache_repo()
 
         app.dependency_overrides[get_url_service] = lambda: mock_svc
+        app.dependency_overrides[get_url_cache_repository] = lambda: mock_cache
 
         response = await client.post(
             "/v0/shortner/deactivate", json={"short_code": "nonexistent"}
@@ -237,6 +288,7 @@ class TestDeactivateShortUrl:
         assert response.status_code == 404
         body = response.json()
         assert "not found or already deactivated" in body["payload"]["message"]
+        mock_cache.delete_short_code.assert_not_awaited()
 
     async def test_deactivate_missing_body(self, client: AsyncClient):
         response = await client.post("/v0/shortner/deactivate")
@@ -250,8 +302,10 @@ class TestDeactivateShortUrl:
 class TestActivateShortUrl:
     async def test_activate_success(self, app: FastAPI, client: AsyncClient):
         mock_svc = _mock_service(mark_as_active=SAMPLE_URL)
+        mock_cache = _mock_cache_repo()
 
         app.dependency_overrides[get_url_service] = lambda: mock_svc
+        app.dependency_overrides[get_url_cache_repository] = lambda: mock_cache
 
         response = await client.post(
             "/v0/shortner/activate", json={"short_code": "abc123"}
@@ -260,11 +314,14 @@ class TestActivateShortUrl:
         assert response.status_code == 200
         body = response.json()
         assert body["payload"]["message"] == "Short URL activated"
+        mock_cache.set_short_code.assert_awaited_once_with("abc123", SAMPLE_URL)
 
     async def test_activate_not_found(self, app: FastAPI, client: AsyncClient):
         mock_svc = _mock_service(mark_as_active=None)
+        mock_cache = _mock_cache_repo()
 
         app.dependency_overrides[get_url_service] = lambda: mock_svc
+        app.dependency_overrides[get_url_cache_repository] = lambda: mock_cache
 
         response = await client.post(
             "/v0/shortner/activate", json={"short_code": "nonexistent"}
@@ -273,6 +330,7 @@ class TestActivateShortUrl:
         assert response.status_code == 404
         body = response.json()
         assert "not found or already activated" in body["payload"]["message"]
+        mock_cache.set_short_code.assert_not_awaited()
 
     async def test_activate_missing_body(self, client: AsyncClient):
         response = await client.post("/v0/shortner/activate")
@@ -286,8 +344,10 @@ class TestActivateShortUrl:
 class TestDeleteShortUrl:
     async def test_delete_success(self, app: FastAPI, client: AsyncClient):
         mock_svc = _mock_service(delete=1)
+        mock_cache = _mock_cache_repo(delete_short_code=1)
 
         app.dependency_overrides[get_url_service] = lambda: mock_svc
+        app.dependency_overrides[get_url_cache_repository] = lambda: mock_cache
 
         response = await client.delete(
             "/v0/shortner/abc123", params={"short_code": "abc123"}
@@ -296,11 +356,14 @@ class TestDeleteShortUrl:
         assert response.status_code == 200
         body = response.json()
         assert body["payload"]["message"] == "Short URL deleted"
+        mock_cache.delete_short_code.assert_awaited_once_with("abc123")
 
     async def test_delete_not_found(self, app: FastAPI, client: AsyncClient):
         mock_svc = _mock_service(delete=NotFound(message="Url not found"))
+        mock_cache = _mock_cache_repo()
 
         app.dependency_overrides[get_url_service] = lambda: mock_svc
+        app.dependency_overrides[get_url_cache_repository] = lambda: mock_cache
 
         response = await client.delete(
             "/v0/shortner/abc123", params={"short_code": "abc123"}
@@ -309,3 +372,4 @@ class TestDeleteShortUrl:
         assert response.status_code == 404
         body = response.json()
         assert body["errors"][0]["type"] == "NOT_FOUND"
+        mock_cache.delete_short_code.assert_not_awaited()
