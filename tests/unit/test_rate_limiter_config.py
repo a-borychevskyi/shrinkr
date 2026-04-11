@@ -1,3 +1,6 @@
+import pytest
+from pydantic import ValidationError
+
 from src.config.rate_limiter import RateLimiterConfig
 
 
@@ -31,3 +34,23 @@ class TestRateLimiterConfig:
         assert config.RATE_LIMIT_DEFAULT_WINDOW == 120
         assert config.RATE_LIMIT_ENABLED is False
         assert config.RATE_LIMIT_KEY_PREFIX == "ratelimit"
+
+    def test_rejects_zero_times(self, monkeypatch):
+        monkeypatch.setenv("REDIS_HOST", "localhost")
+        monkeypatch.setenv("REDIS_PORT", "6379")
+        monkeypatch.setenv("REDIS_DB", "0")
+        monkeypatch.setenv("APP_PREFIX", "shrinkr")
+        monkeypatch.setenv("RATE_LIMIT_DEFAULT_TIMES", "0")
+
+        with pytest.raises(ValidationError):
+            RateLimiterConfig()
+
+    def test_rejects_negative_window(self, monkeypatch):
+        monkeypatch.setenv("REDIS_HOST", "localhost")
+        monkeypatch.setenv("REDIS_PORT", "6379")
+        monkeypatch.setenv("REDIS_DB", "0")
+        monkeypatch.setenv("APP_PREFIX", "shrinkr")
+        monkeypatch.setenv("RATE_LIMIT_DEFAULT_WINDOW", "-1")
+
+        with pytest.raises(ValidationError):
+            RateLimiterConfig()
