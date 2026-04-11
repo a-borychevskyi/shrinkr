@@ -7,6 +7,7 @@ from httpx import ASGITransport, AsyncClient
 
 from src.api.exceptions import ExceptionHandler
 from src.api.v0 import v0_router
+from src.di.clients.redis import get_async_redis_client
 from src.di.repositories.url import get_url_cache_repository
 
 
@@ -16,6 +17,7 @@ def create_test_app() -> FastAPI:
     ExceptionHandler(app).register_handlers()
     app.state.db = MagicMock()
     app.dependency_overrides[get_url_cache_repository] = lambda: AsyncMock()
+    app.dependency_overrides[get_async_redis_client] = lambda: AsyncMock()
     return app
 
 
