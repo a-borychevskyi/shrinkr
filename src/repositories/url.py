@@ -39,17 +39,23 @@ class UrlCacheRepository(StringAbstractRepository[UrlModel]):
             start = time.perf_counter()
             retrieved = await super()._get(short_code)
             elapsed = time.perf_counter() - start
-            cache_operation_duration_seconds.labels(operation="get").observe(elapsed)
+            cache_operation_duration_seconds.record(
+                elapsed, attributes={"operation": "get"}
+            )
 
             if not retrieved:
                 logger.debug(f"Cache miss for short code: {short_code}")
                 span.set_attribute("cache.hit", False)
-                cache_operations_total.labels(operation="get", result="miss").inc()
+                cache_operations_total.add(
+                    1, attributes={"operation": "get", "result": "miss"}
+                )
                 return None
 
             logger.debug(f"Cache hit for short code: {short_code}")
             span.set_attribute("cache.hit", True)
-            cache_operations_total.labels(operation="get", result="hit").inc()
+            cache_operations_total.add(
+                1, attributes={"operation": "get", "result": "hit"}
+            )
             return self._convert_to_entity_model(retrieved)
 
     async def set_short_code(
@@ -65,8 +71,12 @@ class UrlCacheRepository(StringAbstractRepository[UrlModel]):
                 short_code, orjson.dumps(url.model_dump()).decode(), ex=ttl
             )
             elapsed = time.perf_counter() - start
-            cache_operation_duration_seconds.labels(operation="set").observe(elapsed)
-            cache_operations_total.labels(operation="set", result="ok").inc()
+            cache_operation_duration_seconds.record(
+                elapsed, attributes={"operation": "set"}
+            )
+            cache_operations_total.add(
+                1, attributes={"operation": "set", "result": "ok"}
+            )
             return result
 
     async def delete_short_code(self, short_code: str) -> int:
@@ -78,7 +88,11 @@ class UrlCacheRepository(StringAbstractRepository[UrlModel]):
             start = time.perf_counter()
             result = await super()._delete_by_key(short_code)
             elapsed = time.perf_counter() - start
-            cache_operation_duration_seconds.labels(operation="delete").observe(elapsed)
+            cache_operation_duration_seconds.record(
+                elapsed, attributes={"operation": "delete"}
+            )
             result_label = "ok" if result > 0 else "miss"
-            cache_operations_total.labels(operation="delete", result=result_label).inc()
+            cache_operations_total.add(
+                1, attributes={"operation": "delete", "result": result_label}
+            )
             return result

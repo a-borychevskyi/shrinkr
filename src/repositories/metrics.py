@@ -1,14 +1,14 @@
-from prometheus_client import Counter, Histogram
+from opentelemetry import metrics
 
-cache_operations_total = Counter(
-    "cache_operations_total",
-    "Total number of cache operations",
-    labelnames=["operation", "result"],
+meter = metrics.get_meter(__name__)
+
+cache_operations_total = meter.create_counter(
+    name="cache.operations",
+    description="Total number of cache operations",
 )
 
-cache_operation_duration_seconds = Histogram(
-    "cache_operation_duration_seconds",
-    "Time spent on cache operations",
-    labelnames=["operation"],
-    buckets=(0.0005, 0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5),
+cache_operation_duration_seconds = meter.create_histogram(
+    name="cache.operation.duration",
+    description="Time spent on cache operations",
+    unit="s",
 )

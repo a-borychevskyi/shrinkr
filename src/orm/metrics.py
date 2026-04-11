@@ -2,30 +2,29 @@ import re
 import time
 
 from loguru import logger
-from prometheus_client import Counter, Histogram
+from opentelemetry import metrics
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
 
 _OPERATION_RE = re.compile(r"^\s*(SELECT|INSERT|UPDATE|DELETE|WITH)\b", re.IGNORECASE)
 _TABLE_RE = re.compile(r"(?:FROM|INTO|UPDATE|JOIN)\s+([\"']?\w+[\"']?)", re.IGNORECASE)
 
-sql_query_duration = Histogram(
-    "sql_query_duration_seconds",
-    "Time spent executing SQL queries",
-    labelnames=["operation", "table"],
-    buckets=(0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0),
+meter = metrics.get_meter(__name__)
+
+sql_query_duration = meter.create_histogram(
+    name="sql.query.duration",
+    description="Time spent executing SQL queries",
+    unit="s",
 )
 
-sql_query_total = Counter(
-    "sql_query_total",
-    "Total number of SQL queries executed",
-    labelnames=["operation", "table"],
+sql_query_total = meter.create_counter(
+    name="sql.query.count",
+    description="Total number of SQL queries executed",
 )
 
-sql_query_errors = Counter(
-    "sql_query_errors_total",
-    "Total number of failed SQL queries",
-    labelnames=["operation", "table"],
+sql_query_errors = meter.create_counter(
+    name="sql.query.errors",
+    description="Total number of failed SQL queries",
 )
 
 
@@ -58,8 +57,9 @@ def register_query_metrics(engine: Engine) -> None:
         elapsed = time.perf_counter() - conn.info.pop("query_start_time", 0)
         operation = _parse_operation(statement)
         table = _parse_table(statement)
-        sql_query_duration.labels(operation=operation, table=table).observe(elapsed)
-        sql_query_total.labels(operation=operation, table=table).inc()
+        attrs = {"operation": operation, "table": table}
+        sql_query_duration.record(elapsed, attributes=attrs)
+        sql_query_total.add(1, attributes=attrs)
         logger.info(
             "sql_query operation={op} table={tbl} duration={dur:.6f}s query={q}",
             op=operation,
@@ -73,7 +73,7 @@ def register_query_metrics(engine: Engine) -> None:
         statement = exception_context.statement or ""
         operation = _parse_operation(statement)
         table = _parse_table(statement)
-        sql_query_errors.labels(operation=operation, table=table).inc()
+        sql_query_errors.add(1, attributes={"operation": operation, "table": table})
         logger.error(
             "sql_query_error operation={op} table={tbl} error={err} query={q}",
             op=operation,

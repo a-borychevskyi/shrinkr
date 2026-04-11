@@ -22,11 +22,11 @@ services:
       - APP_PREFIX=shrinkr
       - OTEL_ENABLED=true
       - OTEL_SERVICE_NAME=shrinkr
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
     depends_on:
       - postgres
       - redis
-      - jaeger
+      - otel-collector
     networks:
       - monitoring
 
@@ -41,6 +41,21 @@ services:
     networks:
       - monitoring
 
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    container_name: otel-collector
+    restart: unless-stopped
+    command: ["--config=/etc/otelcol/config.yml"]
+    volumes:
+      - ./otel-collector/config.yml:/etc/otelcol/config.yml
+    ports:
+      - "4317:4317"
+      - "8889:8889"
+    depends_on:
+      - jaeger
+    networks:
+      - monitoring
+
   jaeger:
     image: jaegertracing/jaeger:latest
     container_name: jaeger
@@ -49,7 +64,6 @@ services:
       - COLLECTOR_OTLP_ENABLED=true
     ports:
       - "16686:16686"
-      - "4317:4317"
     networks:
       - monitoring
 

@@ -34,7 +34,7 @@
       },
       "targets": [
         {
-          "expr": "sum(increase(sql_query_total[5m]))",
+          "expr": "sum(increase(sql_query_count_total[5m]))",
           "legendFormat": "Queries"
         }
       ]
@@ -121,7 +121,7 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(sql_query_errors_total[5m])) / sum(rate(sql_query_total[5m]))",
+          "expr": "sum(rate(sql_query_errors_total[5m])) / sum(rate(sql_query_count_total[5m]))",
           "legendFormat": "Error Rate"
         }
       ]
@@ -172,7 +172,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (operation) (rate(sql_query_total[1m]))",
+          "expr": "sum by (operation) (rate(sql_query_count_total[1m]))",
           "legendFormat": "{{operation}}"
         }
       ]
@@ -253,7 +253,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (table) (rate(sql_query_total[5m]))",
+          "expr": "sum by (table) (rate(sql_query_count_total[5m]))",
           "legendFormat": "{{table}}"
         }
       ]
@@ -366,7 +366,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (operation) (increase(sql_query_total[1h]))",
+          "expr": "sum by (operation) (increase(sql_query_count_total[1h]))",
           "legendFormat": "{{operation}}"
         }
       ]
@@ -388,7 +388,7 @@
       },
       "targets": [
         {
-          "expr": "topk(10, sum by (table, operation) (increase(sql_query_total[1h])))",
+          "expr": "topk(10, sum by (table, operation) (increase(sql_query_count_total[1h])))",
           "legendFormat": "{{operation}} {{table}}",
           "format": "table",
           "instant": true

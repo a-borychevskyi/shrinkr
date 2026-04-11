@@ -1,7 +1,6 @@
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
-from prometheus_fastapi_instrumentator import Instrumentator
 
 from src.api.exceptions import ExceptionHandler
 from src.api.v0 import v0_router
@@ -30,7 +29,6 @@ def create_app() -> FastAPI:
     app.include_router(v0_router)
     ExceptionHandler(app).register_handlers()
 
-    Instrumentator().instrument(app).expose(app)
     instrument_app(app)
 
     return app

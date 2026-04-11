@@ -39,7 +39,7 @@
       },
       "targets": [
         {
-          "expr": "sum(increase(http_request_duration_seconds_count[5m]))",
+          "expr": "sum(increase(http_server_request_duration_seconds_count[5m]))",
           "legendFormat": "Requests"
         }
       ]
@@ -72,7 +72,7 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(http_request_duration_seconds_count{status=~\"5..\"}[5m])) / sum(rate(http_request_duration_seconds_count[5m]))",
+          "expr": "sum(rate(http_server_request_duration_seconds_count{http_response_status_code=~\"5..\"}[5m])) / sum(rate(http_server_request_duration_seconds_count[5m]))",
           "legendFormat": "Error Rate"
         }
       ]
@@ -103,7 +103,7 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(http_request_duration_seconds_sum[5m])) / sum(rate(http_request_duration_seconds_count[5m]))",
+          "expr": "sum(rate(http_server_request_duration_seconds_sum[5m])) / sum(rate(http_server_request_duration_seconds_count[5m]))",
           "legendFormat": "Avg Latency"
         }
       ]
@@ -130,7 +130,7 @@
       },
       "targets": [
         {
-          "expr": "avg_over_time(up{job=\"the-app\"}[1h])",
+          "expr": "avg_over_time(up{job=\"shrinkr\"}[1h])",
           "legendFormat": "Uptime"
         }
       ]
@@ -174,8 +174,8 @@
       },
       "targets": [
         {
-          "expr": "sum by (status) (rate(http_request_duration_seconds_count[1m]))",
-          "legendFormat": "{{status}}"
+          "expr": "sum by (http_response_status_code) (rate(http_server_request_duration_seconds_count[1m]))",
+          "legendFormat": "{{http_response_status_code}}"
         }
       ]
     },
@@ -214,15 +214,15 @@
       },
       "targets": [
         {
-          "expr": "histogram_quantile(0.50, sum by (le) (rate(http_request_duration_seconds_bucket[5m])))",
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(http_server_request_duration_seconds_bucket[5m])))",
           "legendFormat": "p50"
         },
         {
-          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket[5m])))",
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_server_request_duration_seconds_bucket[5m])))",
           "legendFormat": "p95"
         },
         {
-          "expr": "histogram_quantile(0.99, sum by (le) (rate(http_request_duration_seconds_bucket[5m])))",
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(http_server_request_duration_seconds_bucket[5m])))",
           "legendFormat": "p99"
         }
       ]
@@ -255,8 +255,8 @@
       },
       "targets": [
         {
-          "expr": "sum by (handler) (rate(http_request_duration_seconds_count[5m]))",
-          "legendFormat": "{{handler}}"
+          "expr": "sum by (http_route) (rate(http_server_request_duration_seconds_count[5m]))",
+          "legendFormat": "{{http_route}}"
         }
       ]
     },
@@ -282,8 +282,8 @@
       },
       "targets": [
         {
-          "expr": "sum by (handler) (rate(http_request_duration_seconds_sum[5m])) / sum by (handler) (rate(http_request_duration_seconds_count[5m]))",
-          "legendFormat": "{{handler}}"
+          "expr": "sum by (http_route) (rate(http_server_request_duration_seconds_sum[5m])) / sum by (http_route) (rate(http_server_request_duration_seconds_count[5m]))",
+          "legendFormat": "{{http_route}}"
         }
       ]
     },
@@ -309,8 +309,8 @@
       },
       "targets": [
         {
-          "expr": "sum by (method) (increase(http_request_duration_seconds_count[1h]))",
-          "legendFormat": "{{method}}"
+          "expr": "sum by (http_request_method) (increase(http_server_request_duration_seconds_count[1h]))",
+          "legendFormat": "{{http_request_method}}"
         }
       ]
     },
@@ -345,8 +345,8 @@
       },
       "targets": [
         {
-          "expr": "topk(10, sum by (handler, status) (increase(http_request_duration_seconds_count{status=~\"[45]..\"}[1h])))",
-          "legendFormat": "{{handler}} [{{status}}]",
+          "expr": "topk(10, sum by (http_route, http_response_status_code) (increase(http_server_request_duration_seconds_count{http_response_status_code=~\"[45]..\"}[1h])))",
+          "legendFormat": "{{http_route}} [{{http_response_status_code}}]",
           "format": "table",
           "instant": true
         }
@@ -378,7 +378,7 @@
       },
       "targets": [
         {
-          "expr": "sum(http_requests_inprogress{job=\"the-app\"})",
+          "expr": "sum(http_server_active_requests{job=\"shrinkr\"})",
           "legendFormat": "In-Flight"
         }
       ]
@@ -418,6 +418,6 @@
   "timezone": "browser",
   "title": "Shrinkr API",
   "uid": "shrinkr-api",
-  "version": 1,
+  "version": 2,
   "refresh": "10s"
 }

@@ -68,8 +68,9 @@ class TestGetByShortCode:
 
         with patch("src.repositories.url.cache_operations_total") as mock_counter:
             await repo.get_by_short_code("abc123")
-            mock_counter.labels.assert_called_with(operation="get", result="miss")
-            mock_counter.labels().inc.assert_called_once()
+            mock_counter.add.assert_called_with(
+                1, attributes={"operation": "get", "result": "miss"}
+            )
 
     async def test_cache_hit_increments_hit_counter(self):
         redis = AsyncMock()
@@ -78,8 +79,9 @@ class TestGetByShortCode:
 
         with patch("src.repositories.url.cache_operations_total") as mock_counter:
             await repo.get_by_short_code("abc123")
-            mock_counter.labels.assert_called_with(operation="get", result="hit")
-            mock_counter.labels().inc.assert_called_once()
+            mock_counter.add.assert_called_with(
+                1, attributes={"operation": "get", "result": "hit"}
+            )
 
     async def test_invalid_json_raises_error(self):
         redis = AsyncMock()
@@ -153,8 +155,9 @@ class TestSetShortCode:
 
         with patch("src.repositories.url.cache_operations_total") as mock_counter:
             await repo.set_short_code("abc123", SAMPLE_URL)
-            mock_counter.labels.assert_called_with(operation="set", result="ok")
-            mock_counter.labels().inc.assert_called_once()
+            mock_counter.add.assert_called_with(
+                1, attributes={"operation": "set", "result": "ok"}
+            )
 
     async def test_set_value_is_valid_json(self):
         redis = AsyncMock()
@@ -215,8 +218,9 @@ class TestDeleteShortCode:
 
         with patch("src.repositories.url.cache_operations_total") as mock_counter:
             await repo.delete_short_code("abc123")
-            mock_counter.labels.assert_called_with(operation="delete", result="ok")
-            mock_counter.labels().inc.assert_called_once()
+            mock_counter.add.assert_called_with(
+                1, attributes={"operation": "delete", "result": "ok"}
+            )
 
     async def test_delete_nonexistent_increments_miss_counter(self):
         redis = AsyncMock()
@@ -225,5 +229,6 @@ class TestDeleteShortCode:
 
         with patch("src.repositories.url.cache_operations_total") as mock_counter:
             await repo.delete_short_code("missing")
-            mock_counter.labels.assert_called_with(operation="delete", result="miss")
-            mock_counter.labels().inc.assert_called_once()
+            mock_counter.add.assert_called_with(
+                1, attributes={"operation": "delete", "result": "miss"}
+            )
