@@ -6,6 +6,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from src.models.errors.entity import ErrorModel, ServiceErrorModel
 from src.utils.exceptions.base import BaseApplicationException
+from src.utils.exceptions.rate_limit import RateLimitExceeded
 
 
 def _error_response_to_dict(error_response: ServiceErrorModel) -> dict:
@@ -75,6 +76,17 @@ class ExceptionHandler:
                         ]
                     )
                 ),
+            )
+
+        @self.app.exception_handler(RateLimitExceeded)
+        async def rate_limit_exception_handler(
+            request: Request, exc: RateLimitExceeded
+        ) -> JSONResponse:
+            logger.warning(f"Rate limit exceeded: {exc}")
+            return JSONResponse(
+                status_code=exc.status_code,
+                content=_error_response_to_dict(exc.to_error_response()),
+                headers=exc.headers,
             )
 
         @self.app.exception_handler(BaseApplicationException)
