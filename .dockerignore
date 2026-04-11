@@ -13,7 +13,10 @@ k8s
 helm
 terraform
 grafana
+docs
 tests
 *.md
 .env
 .env.*
+.editorconfig
+.pre-commit-config.yaml
