@@ -4,6 +4,7 @@ from fastapi import APIRouter, Query, Request, Response
 from fastapi.params import Depends
 from fastapi.responses import RedirectResponse
 
+from src.repositories.url import UrlCacheRepository
 from src.api.base import BasePayloadResponse
 from src.api.v0.shortener.url.schemas import (
     ActivateUrlRequest,
@@ -18,6 +19,7 @@ from src.api.v0.shortener.url.schemas import (
 )
 from src.di.services.url import get_url_service
 from src.di.services.url_stats import get_url_stats_service
+from src.di.repositories.url import get_url_cache_repository
 from src.orm.filters.url import UrlFilter
 from src.services.database.url import UrlService
 from src.services.database.url_stats import UrlStatsService
@@ -34,10 +36,16 @@ async def redirect_to_url(
     request: Request,
     query_params: Annotated[RedirectToUrlRequest, Query()],
     url_service: Annotated[UrlService, Depends(get_url_service)],
+    url_cache_repository: Annotated[UrlCacheRepository, Depends(get_url_cache_repository)],
     url_stats_service: Annotated[UrlStatsService, Depends(get_url_stats_service)],
 ) -> RedirectResponse:
     filters = UrlFilter(short_code=query_params.short_code)
-    response = await url_service.get_one(filters)
+
+    response = await url_cache_repository.get_by_short_code(query_params.short_code)
+    if response is None:
+        response = await url_service.get_one(filters)
+        await url_cache_repository.set_short_code(query_params.short_code, response)
+
     if response is None:
         return RedirectResponse(url="/", status_code=302)
 
@@ -103,9 +111,7 @@ async def create_short_url(
     )
 
 
-@router.delete(
-    "/{short_code}", response_model=BasePayloadResponse[DeleteUrlResponse]
-)
+@router.delete("/{short_code}", response_model=BasePayloadResponse[DeleteUrlResponse])
 async def delete_short_url(
     query_params: Annotated[DeleteUrlRequest, Query()],
     url_service: Annotated[UrlService, Depends(get_url_service)],

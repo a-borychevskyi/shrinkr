@@ -6,6 +6,7 @@ from prometheus_fastapi_instrumentator import Instrumentator
 from src.api.exceptions import ExceptionHandler
 from src.api.v0 import v0_router
 from src.di.orm.database import get_db
+from src.telemetry import instrument_app, setup_telemetry
 
 
 @asynccontextmanager
@@ -16,6 +17,8 @@ async def lifespan(app: FastAPI):
 
 
 def create_app() -> FastAPI:
+    setup_telemetry()
+
     app = FastAPI(
         title="URL Shortener API",
         version="0.1.0",
@@ -28,5 +31,6 @@ def create_app() -> FastAPI:
     ExceptionHandler(app).register_handlers()
 
     Instrumentator().instrument(app).expose(app)
+    instrument_app(app)
 
     return app

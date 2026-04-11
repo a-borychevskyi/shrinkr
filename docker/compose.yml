@@ -16,8 +16,53 @@ services:
       - DB_NAME=url_shortener
       - DB_USER=admin
       - DB_PASSWORD=admin
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_DB=0
+      - APP_PREFIX=shrinkr
+      - OTEL_ENABLED=true
+      - OTEL_SERVICE_NAME=shrinkr
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
     depends_on:
       - postgres
+      - redis
+      - jaeger
+    networks:
+      - monitoring
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - monitoring
+
+  jaeger:
+    image: jaegertracing/jaeger:latest
+    container_name: jaeger
+    restart: unless-stopped
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    ports:
+      - "16686:16686"
+      - "4317:4317"
+    networks:
+      - monitoring
+
+  redisinsight:
+    image: redis/redisinsight:latest
+    container_name: redisinsight
+    restart: unless-stopped
+    depends_on:
+      - redis
+    ports:
+      - "5540:5540"
+    volumes:
+      - redisinsight-data:/data
     networks:
       - monitoring
 
@@ -89,6 +134,8 @@ services:
 
 volumes:
   postgres-data:
+  redis-data:
+  redisinsight-data:
 
 networks:
   monitoring:

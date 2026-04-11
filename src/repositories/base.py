@@ -1,16 +1,22 @@
 from __future__ import annotations
 
+from abc import ABC
 from typing import Any, Generic, Sequence, Type, TypeVar, cast
 
 from loguru import logger
+import orjson
+from redis.asyncio import Redis
 from sqlalchemy import ColumnExpressionArgument, delete, func, insert, select, update
 from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.config.redis import RedisConfig
+from src.models.base import BaseEntityModel
 from src.models.base import PydanticOrmModel
 from src.orm.filters.base import BaseFilterModel
 from src.orm.models.base import Base
 from src.orm.sorters.base import BaseSortModel
+from src.utils.exceptions.base import BaseApplicationException
 
 ModelT = TypeVar("ModelT", bound=Base)
 FilterT = TypeVar("FilterT", bound=BaseFilterModel)
@@ -18,7 +24,7 @@ SortT = TypeVar("SortT", bound=BaseSortModel)
 SchemaT = TypeVar("SchemaT", bound=PydanticOrmModel)
 
 
-class DatabaseRepository(Generic[ModelT, FilterT, SortT, SchemaT]):
+class BaseDatabaseRepository(Generic[ModelT, FilterT, SortT, SchemaT]):
     __model__: Type[ModelT]
 
     async def get_one(
@@ -124,3 +130,68 @@ class DatabaseRepository(Generic[ModelT, FilterT, SortT, SchemaT]):
         return cast(
             CursorResult[Any], await async_session.execute(statement=sql)
         ).rowcount
+
+
+type _StrType = str | bytes
+
+
+class BaseAbstractCacheRepository[AbstractModel: BaseEntityModel](ABC):
+    """Base class for else repositories which work with cache"""
+
+    __model__: AbstractModel
+
+    def __init__(self, redis_client: Redis, config: RedisConfig) -> None:
+        self.redis_client = redis_client
+        self.application_prefix = config.APP_PREFIX
+
+    def _get_key(self, key: str) -> str:
+        return f"{self.application_prefix}:{key}"
+
+    def _convert_to_entity_model(self, retrieved: Any) -> AbstractModel:
+        if not retrieved:
+            raise BaseApplicationException(
+                message="Unable to convert to entity model: retrieved value is empty"
+            )
+
+        return self.__model__.model_validate(orjson.loads(retrieved))
+
+    async def _delete_by_key(self, key: str) -> int:
+        return await self.redis_client.delete(self._get_key(key))
+
+    async def base_set(self, key: str, value: _StrType, **kwargs) -> bool | None:
+        return await self.redis_client.set(self._get_key(key), value, **kwargs)
+
+    async def base_get(self, key: str) -> _StrType | None:
+        return await self.redis_client.get(self._get_key(key))
+
+    async def set_expire(self, key: str, expire: int) -> bool:
+        return await self.redis_client.expire(self._get_key(key), expire)
+
+    async def _delete_by_keys(self, keys: list[str]) -> int:
+        return await self.redis_client.delete(*keys)
+
+
+class StringAbstractRepository[AbstractModel: BaseEntityModel](
+    BaseAbstractCacheRepository[AbstractModel]
+):
+    """Base class for work with string data types"""
+
+    __model__: Type = AbstractModel  # type: ignore[misc, assignment]
+
+    async def _set_value(
+        self, key: str, value: str, ex: int | None = None, **kwargs
+    ) -> bool | None:
+        return await self.redis_client.set(self._get_key(key), value, ex=ex, **kwargs)
+
+    async def _get_keys(self, pattern: str) -> list[str]:
+        return await self.redis_client.keys(self._get_key(pattern))
+
+    async def _get_content_by_keys(self, keys: list[str]) -> list:
+        prefix_keys = [self._get_key(key) for key in keys]
+        return await self.redis_client.mget(keys=prefix_keys)
+
+    async def _get(self, key: str) -> str | None:
+        return await self.redis_client.get(self._get_key(key))
+
+    async def _append(self, key: str, value: str) -> int:
+        return await self.redis_client.append(self._get_key(key), value)
