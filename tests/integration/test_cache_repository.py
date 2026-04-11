@@ -74,3 +74,19 @@ async def test_overwrite_existing_key(cache_repo: UrlCacheRepository):
     result = await cache_repo.get_by_short_code("overwrite")
     assert result is not None
     assert result.target_url == "https://second.com"
+
+
+async def test_base_set_and_base_get(
+    cache_repo: UrlCacheRepository, redis_client: Redis
+):
+    await cache_repo.base_set("raw_key", "raw_value")
+    result = await cache_repo.base_get("raw_key")
+    assert result == "raw_value"
+
+
+async def test_set_expire(cache_repo: UrlCacheRepository, redis_client: Redis):
+    await cache_repo.base_set("expire_key", "value")
+    result = await cache_repo.set_expire("expire_key", 120)
+    assert result is True
+    ttl = await redis_client.ttl("test:expire_key")
+    assert 0 < ttl <= 120
