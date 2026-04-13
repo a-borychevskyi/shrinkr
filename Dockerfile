@@ -16,7 +16,7 @@ FROM python:3.12-slim
 
 LABEL org.opencontainers.image.title="shrinkr" \
       org.opencontainers.image.description="Production-grade URL shortener with analytics" \
-      org.opencontainers.image.source="https://github.com/andriiboryshevskyi/url-shortner"
+      org.opencontainers.image.source="https://github.com/a-borychevskyi/shrinkr"
 
 RUN groupadd --system app && useradd --system --gid app --shell /usr/sbin/nologin app
 
