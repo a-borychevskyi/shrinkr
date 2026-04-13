@@ -10,6 +10,7 @@ from src.di.services.url_stats import get_url_stats_service
 from src.models.base import ManyCustomResponse
 from src.models.url.entity import UrlModel
 from src.models.url_stats.entity import UrlStatsModel
+from src.services.click_ingest import ClickEvent
 from src.utils.exceptions.base import NotFound
 
 
@@ -64,28 +65,24 @@ def _mock_cache_repo(get_by_short_code=None, set_short_code=None, delete_short_c
 class TestRedirectToUrl:
     async def test_redirect_returns_none(self, app: FastAPI, client: AsyncClient):
         mock_url = _mock_service(get_one=None)
-        mock_stats = _mock_service()
         mock_cache = _mock_cache_repo()
 
         app.dependency_overrides[get_url_service] = lambda: mock_url
-        app.dependency_overrides[get_url_stats_service] = lambda: mock_stats
         app.dependency_overrides[get_url_cache_repository] = lambda: mock_cache
 
         response = await client.get("/abc123", follow_redirects=False)
 
         assert response.status_code == 302
         assert response.headers["location"] == "/"
-        mock_stats.create.assert_not_awaited()
+        app.state.click_ingester.enqueue.assert_not_called()
 
     async def test_redirect_cache_miss_falls_back_to_db(
         self, app: FastAPI, client: AsyncClient
     ):
         mock_url = _mock_service(get_one=SAMPLE_URL)
-        mock_stats = _mock_service(create=None)
         mock_cache = _mock_cache_repo()
 
         app.dependency_overrides[get_url_service] = lambda: mock_url
-        app.dependency_overrides[get_url_stats_service] = lambda: mock_stats
         app.dependency_overrides[get_url_cache_repository] = lambda: mock_cache
 
         response = await client.get("/abc123", follow_redirects=False)
@@ -95,15 +92,13 @@ class TestRedirectToUrl:
         mock_cache.get_by_short_code.assert_awaited_once_with("abc123")
         mock_url.get_one.assert_awaited_once()
         mock_cache.set_short_code.assert_awaited_once()
-        mock_stats.create.assert_awaited_once()
+        app.state.click_ingester.enqueue.assert_called_once()
 
     async def test_redirect_cache_hit_skips_db(self, app: FastAPI, client: AsyncClient):
         mock_url = _mock_service()
-        mock_stats = _mock_service(create=None)
         mock_cache = _mock_cache_repo(get_by_short_code=SAMPLE_URL)
 
         app.dependency_overrides[get_url_service] = lambda: mock_url
-        app.dependency_overrides[get_url_stats_service] = lambda: mock_stats
         app.dependency_overrides[get_url_cache_repository] = lambda: mock_cache
 
         response = await client.get("/abc123", follow_redirects=False)
@@ -113,15 +108,13 @@ class TestRedirectToUrl:
         mock_cache.get_by_short_code.assert_awaited_once_with("abc123")
         mock_url.get_one.assert_not_awaited()
         mock_cache.set_short_code.assert_not_awaited()
-        mock_stats.create.assert_awaited_once()
+        app.state.click_ingester.enqueue.assert_called_once()
 
     async def test_redirect_not_found(self, app: FastAPI, client: AsyncClient):
         mock_url = _mock_service(get_one=NotFound(message="Url not found"))
-        mock_stats = _mock_service()
         mock_cache = _mock_cache_repo()
 
         app.dependency_overrides[get_url_service] = lambda: mock_url
-        app.dependency_overrides[get_url_stats_service] = lambda: mock_stats
         app.dependency_overrides[get_url_cache_repository] = lambda: mock_cache
 
         response = await client.get("/nonexistent")
@@ -129,17 +122,15 @@ class TestRedirectToUrl:
         assert response.status_code == 404
         body = response.json()
         assert body["errors"][0]["type"] == "NOT_FOUND"
-        mock_stats.create.assert_not_awaited()
+        app.state.click_ingester.enqueue.assert_not_called()
 
     async def test_redirect_tracks_ip_and_user_agent(
         self, app: FastAPI, client: AsyncClient
     ):
         mock_url = _mock_service(get_one=SAMPLE_URL)
-        mock_stats = _mock_service(create=None)
         mock_cache = _mock_cache_repo()
 
         app.dependency_overrides[get_url_service] = lambda: mock_url
-        app.dependency_overrides[get_url_stats_service] = lambda: mock_stats
         app.dependency_overrides[get_url_cache_repository] = lambda: mock_cache
 
         await client.get(
@@ -148,9 +139,11 @@ class TestRedirectToUrl:
             follow_redirects=False,
         )
 
-        call_kwargs = mock_stats.create.call_args.kwargs
-        assert call_kwargs["user_agent"] == "TestBot/1.0"
-        assert call_kwargs["url_id"] == 1
+        app.state.click_ingester.enqueue.assert_called_once()
+        event = app.state.click_ingester.enqueue.call_args.args[0]
+        assert isinstance(event, ClickEvent)
+        assert event.user_agent == "TestBot/1.0"
+        assert event.url_id == 1
 
     async def test_redirect_does_not_shadow_api_routes(self, client: AsyncClient):
         # The catch-all redirect must not intercept /docs, /openapi.json,

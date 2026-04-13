@@ -187,7 +187,38 @@ The full monitoring stack runs alongside the app in Docker Compose:
 
 - **Structured logging** — structlog outputs JSON in production and pretty-printed logs in development. Logs are scraped by Promtail and aggregated in Loki.
 - **Distributed tracing** — OpenTelemetry auto-instruments FastAPI, SQLAlchemy, and Redis. Traces are exported via OTLP to Jaeger through the OTel Collector.
-- **Metrics** — Prometheus scrapes application metrics (cache hit/miss rates, DB operation counts). Three pre-built Grafana dashboards ship with the project: application overview, Redis metrics, and SQL metrics.
+- **Metrics** — Prometheus scrapes application metrics (cache hit/miss rates, DB operation counts, rate-limit rejections). Four pre-built Grafana dashboards ship with the project: application overview, Redis metrics, SQL metrics, and a load-testing dashboard (see *Performance*).
+
+## Performance
+
+The redirect hot path was stress-tested with Locust (see [`load/`](load/)) and iteratively tuned using the built-in Prometheus + Grafana stack. Each step below only became visible *after* the previous bottleneck was removed.
+
+**Changes, in order applied:**
+
+1. Click tracking off the redirect critical path — synchronous `INSERT` → `BackgroundTask` → in-process batching queue.
+2. Dropped per-query SQL INFO log and per-429 WARN log — blocking stdout writes were stalling the async event loop (app CPU sat at ~1% while p95 was pinned at 240 ms).
+3. Flipped to JSON logs (production mode) and parametrized gunicorn worker count via `WEB_CONCURRENCY`.
+4. `@lru_cache` on the async Redis client — request-scoped instantiation was exhausting the kernel's ephemeral-port range under load.
+5. Right-sized the SQLAlchemy pool against Postgres `max_connections` via `DB_POOL_SIZE` / `DB_MAX_OVERFLOW`.
+6. Batched click ingestion — the redirect handler enqueues a `ClickEvent`; a background consumer drains the queue every 100 ms and flushes via a single multi-row `INSERT` per batch, no `RETURNING`.
+
+**Result — same infrastructure, 250 concurrent users:**
+
+| Signal                   | Baseline | Optimized   |
+|--------------------------|----------|-------------|
+| Throughput               | 268 rps  | **1,803 rps** |
+| `GET /{short_code}` p95  | 240 ms   | **87 ms**   |
+| p99 overall              | 386 ms   | **100 ms**  |
+| Postgres CPU at peak     | 97 %     | **13 %**    |
+| Failures                 | 0        | 0           |
+
+Reproduce it yourself:
+
+```bash
+docker compose -f docker/compose.yml --profile load up --build
+```
+
+Then drive load from the Locust UI at `http://localhost:8089` and watch live RPS and latency on the **Shrinkr / Locust** dashboard in Grafana (`http://localhost:3000`).
 
 ## Docker
 
@@ -233,6 +264,6 @@ python -m http.server -d docs/_build/html 8080
 - **Authentication** — API key or JWT-based auth for link management.
 - **Terraform** — AWS infrastructure as code (VPC, RDS, ElastiCache, ECS Fargate, ALB).
 - **Kubernetes** — Deployment manifests, Helm chart, HPA autoscaling.
-- **Analytics pipeline** — Kafka for async click ingestion, ClickHouse for analytical queries.
+- **Analytics pipeline** — Kafka for durable, cross-worker click ingestion (current impl is an in-process batched queue per worker) and ClickHouse for analytical queries.
 - **Geo-distributed caching** — CDN or edge caching for redirect latency.
 - **Custom alias and expiration** — Let users choose their own short codes and set link expiry.

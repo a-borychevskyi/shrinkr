@@ -62,13 +62,6 @@ def register_query_metrics(engine: Engine) -> None:
         attrs = {"operation": operation, "table": table}
         sql_query_duration.record(elapsed, attributes=attrs)
         sql_query_total.add(1, attributes=attrs)
-        logger.info(
-            "sql_query",
-            operation=operation,
-            table=table,
-            duration=round(elapsed, 6),
-            query=statement.replace("\n", " ").strip(),
-        )
 
     @event.listens_for(engine, "handle_error")
     def _handle_error(exception_context):

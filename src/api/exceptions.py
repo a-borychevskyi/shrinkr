@@ -84,7 +84,6 @@ class ExceptionHandler:
         async def rate_limit_exception_handler(
             request: Request, exc: RateLimitExceeded
         ) -> JSONResponse:
-            logger.warning("rate_limit_exceeded", detail=str(exc))
             return JSONResponse(
                 status_code=exc.status_code,
                 content=_error_response_to_dict(exc.to_error_response()),

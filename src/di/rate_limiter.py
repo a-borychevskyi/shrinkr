@@ -2,9 +2,8 @@ import time
 from functools import lru_cache
 from typing import Annotated
 
-import structlog
 from fastapi import Depends, Request, Response
-from opentelemetry import trace
+from opentelemetry import metrics, trace
 from redis.asyncio import Redis
 
 from src.config.rate_limiter import RateLimiterConfig
@@ -12,8 +11,13 @@ from src.di.clients.redis import get_async_redis_client
 from src.utils.client_ip import get_client_ip
 from src.utils.exceptions.rate_limit import RateLimitExceeded
 
-logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer(__name__)
+meter = metrics.get_meter(__name__)
+
+rate_limit_rejections_total = meter.create_counter(
+    name="rate_limit.rejections",
+    description="Total number of requests rejected by the rate limiter",
+)
 
 LUA_SCRIPT = """
 -- Sliding window counter rate limit.
@@ -161,13 +165,7 @@ class RateLimiter:
 
             if not allowed:
                 retry_after = max(1, reset_at - now)
-                logger.warning(
-                    "rate_limit_exceeded",
-                    client_ip=client_ip,
-                    route=route_pattern,
-                    limit=times,
-                    window_seconds=seconds,
-                )
+                rate_limit_rejections_total.add(1, attributes={"route": route_pattern})
                 raise RateLimitExceeded(
                     retry_after=retry_after,
                     headers={

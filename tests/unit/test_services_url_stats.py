@@ -137,20 +137,6 @@ class TestGetAll:
         assert result == []
 
 
-class TestCreate:
-    async def test_creates_stats_record(self):
-        stats_repo = _make_repo()
-        stats_repo.create = AsyncMock(return_value=SAMPLE_STATS_ORM)
-
-        svc = _make_service(stats_repo=stats_repo)
-        result = await svc.create(
-            url_id=1, user_agent="Mozilla/5.0", ip_address="127.0.0.1"
-        )
-
-        assert result.url_id == 1
-        stats_repo.create.assert_awaited_once()
-
-
 class TestCreateMany:
     async def test_creates_multiple_stats(self):
         stats_repo = _make_repo()

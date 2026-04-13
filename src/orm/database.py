@@ -13,7 +13,10 @@ from src.orm.metrics import register_query_metrics
 class Database:
     def __init__(self, config: DatabaseConfig):
         self.async_engine = create_async_engine(
-            url=config.DB_URL, pool_pre_ping=True, pool_size=30, max_overflow=0
+            url=config.DB_URL,
+            pool_pre_ping=True,
+            pool_size=config.DB_POOL_SIZE,
+            max_overflow=config.DB_MAX_OVERFLOW,
         )
         register_query_metrics(self.async_engine.sync_engine)
         self.session_factory = async_scoped_session(

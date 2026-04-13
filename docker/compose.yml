@@ -10,7 +10,7 @@ services:
     environment:
       - APP_HOST=0.0.0.0
       - APP_PORT=8000
-      - APP_ENVIRONMENT=development
+      - APP_ENVIRONMENT=production
       - DB_HOST=postgres
       - DB_PORT=5432
       - DB_NAME=url_shortener
@@ -23,6 +23,7 @@ services:
       - OTEL_ENABLED=true
       - OTEL_SERVICE_NAME=shrinkr
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - WEB_CONCURRENCY=8
     depends_on:
       - postgres
       - redis
@@ -132,9 +133,25 @@ services:
     networks:
       - monitoring
 
+  locust:
+    build:
+      context: ..
+      dockerfile: docker/locust.Dockerfile
+    container_name: locust
+    profiles: ["load"]
+    command: ["--host", "http://the-app:8000"]
+    ports:
+      - "8089:8089"   # Locust web UI
+      - "9646:9646"   # Prometheus metrics
+    depends_on:
+      - the-app
+    networks:
+      - monitoring
+
   postgres:
     image: postgres:18.0-alpine
     restart: always
+    command: ["postgres", "-c", "max_connections=500"]
     environment:
       POSTGRES_USER: admin
       POSTGRES_PASSWORD: admin
