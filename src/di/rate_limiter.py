@@ -3,7 +3,7 @@ from functools import lru_cache
 from typing import Annotated
 
 from fastapi import Depends, Request, Response
-from opentelemetry import trace
+from opentelemetry import metrics, trace
 from redis.asyncio import Redis
 
 from src.config.rate_limiter import RateLimiterConfig
@@ -12,6 +12,12 @@ from src.utils.client_ip import get_client_ip
 from src.utils.exceptions.rate_limit import RateLimitExceeded
 
 tracer = trace.get_tracer(__name__)
+meter = metrics.get_meter(__name__)
+
+rate_limit_rejections_total = meter.create_counter(
+    name="rate_limit.rejections",
+    description="Total number of requests rejected by the rate limiter",
+)
 
 LUA_SCRIPT = """
 -- Sliding window counter rate limit.
@@ -159,6 +165,7 @@ class RateLimiter:
 
             if not allowed:
                 retry_after = max(1, reset_at - now)
+                rate_limit_rejections_total.add(1, attributes={"route": route_pattern})
                 raise RateLimitExceeded(
                     retry_after=retry_after,
                     headers={
