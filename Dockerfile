@@ -29,7 +29,8 @@ COPY --from=builder /app/alembic.ini .
 
 ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    WEB_CONCURRENCY=4
 
 USER app
 
@@ -40,5 +41,4 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
 
 CMD ["gunicorn", "src.main:app", \
     "--bind", "0.0.0.0:8000", \
-    "--workers", "4", \
     "--worker-class", "uvicorn.workers.UvicornWorker"]

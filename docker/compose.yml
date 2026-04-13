@@ -23,6 +23,7 @@ services:
       - OTEL_ENABLED=true
       - OTEL_SERVICE_NAME=shrinkr
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - WEB_CONCURRENCY=8
     depends_on:
       - postgres
       - redis
