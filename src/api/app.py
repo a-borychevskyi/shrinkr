@@ -1,3 +1,4 @@
+import asyncio
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -5,10 +6,10 @@ from fastapi import FastAPI
 from src.api.exceptions import ExceptionHandler
 from src.api.redirect import router as redirect_router
 from src.api.v0 import v0_router
+from src.di.clients.kafka_producer import get_click_producer
 from src.di.orm.database import get_db
 from src.di.rate_limiter import get_rate_limiter_config
 from src.logging import setup_logging
-from src.services.click_ingest import ClickIngester
 from src.telemetry import instrument_app, setup_telemetry
 
 
@@ -18,11 +19,32 @@ async def lifespan(app: FastAPI):
     # raise immediately instead of surfacing on the first rate-limited request.
     get_rate_limiter_config()
     app.state.db = get_db()
-    app.state.click_ingester = ClickIngester(engine=app.state.db.async_engine)
-    await app.state.click_ingester.start()
-    yield
-    await app.state.click_ingester.stop()
-    await app.state.db.stop()
+    app.state.click_producer = get_click_producer()
+
+    # librdkafka requires periodic poll(0) to drain delivery reports; without
+    # this the C-side queue grows unbounded.
+    poll_stop = asyncio.Event()
+
+    async def _poll_loop() -> None:
+        while not poll_stop.is_set():
+            app.state.click_producer.poll()
+            try:
+                await asyncio.wait_for(poll_stop.wait(), timeout=0.1)
+            except TimeoutError:
+                pass
+
+    app.state.click_producer_poll_task = asyncio.create_task(
+        _poll_loop(), name="click-producer-poll"
+    )
+    app.state.click_producer_poll_stop = poll_stop
+
+    try:
+        yield
+    finally:
+        poll_stop.set()
+        await app.state.click_producer_poll_task
+        app.state.click_producer.flush(timeout=5.0)
+        await app.state.db.stop()
 
 
 def create_app() -> FastAPI:

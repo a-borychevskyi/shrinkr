@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 from typing import Annotated
 
 from fastapi import APIRouter, Request
@@ -7,9 +8,9 @@ from opentelemetry import trace
 
 from src.di.repositories.url import get_url_cache_repository
 from src.di.services.url import get_url_service
+from src.kafka.schema import ClickEvent
 from src.orm.filters.url import UrlFilter
 from src.repositories.url import UrlCacheRepository
-from src.services.click_ingest import ClickEvent
 from src.services.database.url import UrlService
 
 router = APIRouter(tags=["Redirect"])
@@ -52,7 +53,12 @@ async def redirect_to_url(
     _id = response.id if response.id is not None else -1
     ip_address = request.client.host if request.client is not None else "unknown"
     user_agent = request.headers.get("user-agent", "unknown")
-    request.app.state.click_ingester.enqueue(
-        ClickEvent(url_id=_id, user_agent=user_agent, ip_address=ip_address)
+    request.app.state.click_producer.send(
+        ClickEvent(
+            url_id=_id,
+            user_agent=user_agent,
+            ip_address=ip_address,
+            occurred_at=datetime.now(timezone.utc),
+        )
     )
     return RedirectResponse(url=response.target_url, status_code=302)
