@@ -50,6 +50,16 @@ async def _async_main() -> None:
     )
     raw_consumer.subscribe([CLICKS_TOPIC])
 
+    logger.info(
+        "worker_starting",
+        topic=CLICKS_TOPIC,
+        group=config.KAFKA_CONSUMER_GROUP,
+        bootstrap_servers=config.KAFKA_BOOTSTRAP_SERVERS,
+        batch_size=config.KAFKA_CONSUMER_BATCH_SIZE,
+        flush_interval_ms=config.KAFKA_CONSUMER_FLUSH_INTERVAL_MS,
+        http_port=config.WORKER_HTTP_PORT,
+    )
+
     click_consumer = ClickConsumer(
         consumer=cast(KafkaConsumerProtocol, raw_consumer),
         repository=repository,
@@ -90,6 +100,7 @@ async def _async_main() -> None:
     # we'd wait for partition assignment via on_assign callback — left as
     # a future improvement; documented in the design spec.)
     ready_flag.set()
+    logger.info("worker_ready", http_port=config.WORKER_HTTP_PORT)
 
     stop_event = asyncio.Event()
 

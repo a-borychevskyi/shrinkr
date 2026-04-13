@@ -73,6 +73,11 @@ class ClickConsumer:
 
     def run_poll_loop(self, loop: asyncio.AbstractEventLoop) -> None:
         """Blocking poll loop intended to run in its own thread."""
+        logger.info(
+            "click_poll_loop_started",
+            poll_timeout_seconds=self._poll_timeout,
+            flush_timeout_seconds=self._flush_timeout,
+        )
         try:
             while not self._stop.is_set():
                 msg = self._consumer.poll(timeout=self._poll_timeout)
@@ -89,6 +94,7 @@ class ClickConsumer:
             if len(self._batcher) > 0:
                 self._submit_flush(loop, self._batcher.drain())
             self._update_lag_gauge()
+            logger.info("click_poll_loop_stopped")
         finally:
             self._consumer.close()
 
@@ -134,8 +140,14 @@ class ClickConsumer:
         CLICKS_BATCH_SIZE.observe(len(batch))
         start = perf_counter()
         await self._repository.insert_many(batch)
-        CLICKS_FLUSH_DURATION_SECONDS.observe(perf_counter() - start)
+        duration_seconds = perf_counter() - start
+        CLICKS_FLUSH_DURATION_SECONDS.observe(duration_seconds)
         CLICKS_INSERTED_TOTAL.inc(len(batch))
+        logger.info(
+            "click_batch_flushed",
+            count=len(batch),
+            duration_ms=round(duration_seconds * 1000, 2),
+        )
 
     def _decode_or_skip(self, msg: Any) -> ClickEvent | None:
         try:
