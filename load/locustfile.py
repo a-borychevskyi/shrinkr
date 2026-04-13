@@ -89,7 +89,6 @@ class RedirectUser(FastHttpUser):
     """Reads. Seeds short codes on start, then GETs the redirect endpoint."""
 
     weight = 9
-    wait_time = between(0, 0.1)
 
     codes: list[str]
 
