@@ -34,3 +34,14 @@ class TestClickEventEncoding:
     def test_decode_rejects_invalid_json(self):
         with pytest.raises(ValueError):
             decode_click_event(b"not json")
+
+    def test_decode_rejects_invalid_timestamp(self):
+        with pytest.raises(ValueError):
+            decode_click_event(
+                b'{"url_id": 1, "user_agent": "ua", "ip_address": "ip", "occurred_at": "not-a-date"}'
+            )
+
+    def test_decode_naive_timestamp_defaults_to_utc(self):
+        raw = b'{"url_id": 1, "user_agent": "ua", "ip_address": "ip", "occurred_at": "2026-04-13T10:15:30"}'
+        event = decode_click_event(raw)
+        assert event.occurred_at.tzinfo == timezone.utc

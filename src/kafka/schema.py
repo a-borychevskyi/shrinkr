@@ -52,7 +52,7 @@ def decode_click_event(raw: bytes) -> ClickEvent:
             ip_address=str(payload["ip_address"]),
             occurred_at=_parse_iso(payload["occurred_at"]),
         )
-    except (KeyError, TypeError) as exc:
+    except (KeyError, TypeError, ValueError) as exc:
         raise ValueError(f"missing or invalid field: {exc}") from exc
 
 
