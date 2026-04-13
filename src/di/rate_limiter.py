@@ -2,7 +2,6 @@ import time
 from functools import lru_cache
 from typing import Annotated
 
-import structlog
 from fastapi import Depends, Request, Response
 from opentelemetry import trace
 from redis.asyncio import Redis
@@ -12,7 +11,6 @@ from src.di.clients.redis import get_async_redis_client
 from src.utils.client_ip import get_client_ip
 from src.utils.exceptions.rate_limit import RateLimitExceeded
 
-logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer(__name__)
 
 LUA_SCRIPT = """
@@ -161,13 +159,6 @@ class RateLimiter:
 
             if not allowed:
                 retry_after = max(1, reset_at - now)
-                logger.warning(
-                    "rate_limit_exceeded",
-                    client_ip=client_ip,
-                    route=route_pattern,
-                    limit=times,
-                    window_seconds=seconds,
-                )
                 raise RateLimitExceeded(
                     retry_after=retry_after,
                     headers={

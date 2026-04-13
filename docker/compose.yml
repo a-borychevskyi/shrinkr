@@ -10,7 +10,7 @@ services:
     environment:
       - APP_HOST=0.0.0.0
       - APP_PORT=8000
-      - APP_ENVIRONMENT=development
+      - APP_ENVIRONMENT=production
       - DB_HOST=postgres
       - DB_PORT=5432
       - DB_NAME=url_shortener
