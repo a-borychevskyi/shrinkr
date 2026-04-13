@@ -23,7 +23,7 @@ from src.kafka.schema import ClickEvent, encode_click_event
 logger = structlog.get_logger(__name__)
 
 
-class _KafkaProducerProtocol(Protocol):
+class KafkaProducerProtocol(Protocol):
     def produce(self, topic, key=None, value=None, on_delivery=None) -> None: ...
     def poll(self, timeout: float) -> int: ...
     def flush(self, timeout: float) -> int: ...
@@ -32,7 +32,7 @@ class _KafkaProducerProtocol(Protocol):
 class ClickProducer:
     """Sends ClickEvent payloads to a Kafka topic, keyed by url_id."""
 
-    def __init__(self, producer: _KafkaProducerProtocol, topic: str) -> None:
+    def __init__(self, producer: KafkaProducerProtocol, topic: str) -> None:
         self._producer = producer
         self._topic = topic
 

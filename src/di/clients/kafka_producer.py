@@ -6,11 +6,12 @@ managed in src/api/app.py.
 """
 
 from functools import lru_cache
+from typing import cast
 
 from confluent_kafka import Producer
 
 from src.config.kafka import KafkaConfig
-from src.kafka.producer import ClickProducer
+from src.kafka.producer import ClickProducer, KafkaProducerProtocol
 
 
 @lru_cache(maxsize=1)
@@ -28,4 +29,7 @@ def get_click_producer() -> ClickProducer:
             "client.id": "shrinkr-api",
         }
     )
-    return ClickProducer(producer=raw_producer, topic=config.KAFKA_CLICKS_TOPIC)
+    return ClickProducer(
+        producer=cast(KafkaProducerProtocol, raw_producer),
+        topic=config.KAFKA_CLICKS_TOPIC,
+    )

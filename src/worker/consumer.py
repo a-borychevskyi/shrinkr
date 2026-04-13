@@ -37,7 +37,7 @@ from src.worker.repository import UrlStatsBulkRepository
 logger = structlog.get_logger(__name__)
 
 
-class _KafkaConsumerProtocol(Protocol):
+class KafkaConsumerProtocol(Protocol):
     def poll(self, timeout: float) -> Any: ...
     def commit(self, message: Any = None, asynchronous: bool = True) -> Any: ...
     def close(self) -> None: ...
@@ -52,7 +52,7 @@ class _KafkaConsumerProtocol(Protocol):
 class ClickConsumer:
     def __init__(
         self,
-        consumer: _KafkaConsumerProtocol,
+        consumer: KafkaConsumerProtocol,
         repository: UrlStatsBulkRepository,
         batch_size: int,
         flush_interval_seconds: float,

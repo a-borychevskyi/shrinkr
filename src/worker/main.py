@@ -16,6 +16,7 @@ from __future__ import annotations
 import asyncio
 import signal
 import threading
+from typing import cast
 
 import structlog
 import uvicorn
@@ -26,7 +27,7 @@ from src.di.orm.database import get_db
 from src.kafka.topics import CLICKS_TOPIC
 from src.logging import setup_logging
 from src.telemetry import setup_telemetry
-from src.worker.consumer import ClickConsumer
+from src.worker.consumer import ClickConsumer, KafkaConsumerProtocol
 from src.worker.http import build_app, is_thread_alive
 from src.worker.repository import UrlStatsBulkRepository
 
@@ -50,7 +51,7 @@ async def _async_main() -> None:
     raw_consumer.subscribe([CLICKS_TOPIC])
 
     click_consumer = ClickConsumer(
-        consumer=raw_consumer,
+        consumer=cast(KafkaConsumerProtocol, raw_consumer),
         repository=repository,
         batch_size=config.KAFKA_CONSUMER_BATCH_SIZE,
         flush_interval_seconds=config.KAFKA_CONSUMER_FLUSH_INTERVAL_MS / 1000,
