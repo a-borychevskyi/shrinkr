@@ -309,3 +309,4 @@ cython_debug/
 .idea/
 .claude/
 CLAUDE.md
+docs/superpowers/
