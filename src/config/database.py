@@ -9,6 +9,14 @@ class DatabaseConfig(BaseConfig):
     DB_NAME: str = Field(..., description="The database name")
     DB_USER: str = Field(..., description="The database user")
     DB_PASSWORD: SecretStr = Field(..., description="The database password")
+    DB_POOL_SIZE: int = Field(
+        default=10,
+        description="SQLAlchemy pool size per worker process",
+    )
+    DB_MAX_OVERFLOW: int = Field(
+        default=5,
+        description="Extra connections allowed beyond DB_POOL_SIZE before blocking",
+    )
 
     @property
     def DB_URL(self) -> str:
