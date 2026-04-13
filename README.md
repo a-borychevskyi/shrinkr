@@ -1,5 +1,7 @@
 # Shrinkr
 
+[![CI](https://github.com/a-borychevskyi/url-shortener/actions/workflows/ci.yml/badge.svg)](https://github.com/a-borychevskyi/url-shortener/actions/workflows/ci.yml)
+
 A production-grade URL shortener with analytics and full observability, built to demonstrate backend and DevOps skills.
 
 ## Architecture
