@@ -21,6 +21,10 @@ class ClickEvent:
     ip_address: str
     occurred_at: datetime
 
+    def __post_init__(self) -> None:
+        if self.occurred_at.tzinfo is None:
+            raise ValueError("ClickEvent.occurred_at must be timezone-aware")
+
 
 def encode_click_event(event: ClickEvent) -> bytes:
     """Serialize a ClickEvent to JSON bytes for Kafka produce()."""

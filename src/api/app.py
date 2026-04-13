@@ -1,6 +1,7 @@
 import asyncio
 from contextlib import asynccontextmanager
 
+import structlog
 from fastapi import FastAPI
 
 from src.api.exceptions import ExceptionHandler
@@ -11,6 +12,8 @@ from src.di.orm.database import get_db
 from src.di.rate_limiter import get_rate_limiter_config
 from src.logging import setup_logging
 from src.telemetry import instrument_app, setup_telemetry
+
+logger = structlog.get_logger(__name__)
 
 
 @asynccontextmanager
@@ -26,12 +29,17 @@ async def lifespan(app: FastAPI):
     poll_stop = asyncio.Event()
 
     async def _poll_loop() -> None:
+        logger.info("click_producer_poll_loop_started")
         while not poll_stop.is_set():
-            app.state.click_producer.poll()
+            try:
+                app.state.click_producer.poll()
+            except Exception:
+                logger.warning("click_producer_poll_failed", exc_info=True)
             try:
                 await asyncio.wait_for(poll_stop.wait(), timeout=0.1)
             except TimeoutError:
                 pass
+        logger.info("click_producer_poll_loop_stopped")
 
     app.state.click_producer_poll_task = asyncio.create_task(
         _poll_loop(), name="click-producer-poll"
@@ -43,8 +51,12 @@ async def lifespan(app: FastAPI):
     finally:
         poll_stop.set()
         await app.state.click_producer_poll_task
-        app.state.click_producer.flush(timeout=5.0)
-        await app.state.db.stop()
+        try:
+            app.state.click_producer.flush(timeout=5.0)
+        except Exception:
+            logger.warning("click_producer_flush_failed_on_shutdown", exc_info=True)
+        finally:
+            await app.state.db.stop()
 
 
 def create_app() -> FastAPI:

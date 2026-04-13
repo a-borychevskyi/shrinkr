@@ -144,6 +144,7 @@ class TestRedirectToUrl:
         assert isinstance(event, ClickEvent)
         assert event.user_agent == "TestBot/1.0"
         assert event.url_id == 1
+        assert event.occurred_at.tzinfo is not None
 
     async def test_redirect_does_not_shadow_api_routes(self, client: AsyncClient):
         # The catch-all redirect must not intercept /docs, /openapi.json,

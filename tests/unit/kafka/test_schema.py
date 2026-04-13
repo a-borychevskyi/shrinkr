@@ -45,3 +45,14 @@ class TestClickEventEncoding:
         raw = b'{"url_id": 1, "user_agent": "ua", "ip_address": "ip", "occurred_at": "2026-04-13T10:15:30"}'
         event = decode_click_event(raw)
         assert event.occurred_at.tzinfo == timezone.utc
+
+    def test_click_event_rejects_naive_datetime(self):
+        from datetime import datetime as _dt
+
+        with pytest.raises(ValueError, match="timezone-aware"):
+            ClickEvent(
+                url_id=1,
+                user_agent="ua",
+                ip_address="ip",
+                occurred_at=_dt(2026, 4, 13, 10, 0, 0),  # naive
+            )
