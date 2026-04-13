@@ -408,6 +408,282 @@
           "legendFormat": ""
         }
       ]
+    },
+    {
+      "type": "row",
+      "title": "Click Pipeline",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 45 },
+      "collapsed": false
+    },
+    {
+      "type": "stat",
+      "title": "Clicks Inserted (5m)",
+      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 46 },
+      "datasource": { "type": "prometheus", "uid": "ds-prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "value",
+        "graphMode": "area",
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(clicks_inserted_total{job=\"shrinkr-worker\"}[5m]))",
+          "legendFormat": "Inserted"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Clicks Dropped (5m)",
+      "gridPos": { "h": 6, "w": 6, "x": 6, "y": 46 },
+      "datasource": { "type": "prometheus", "uid": "ds-prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 100 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(clicks_dropped_total[5m]))",
+          "legendFormat": "Dropped"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Malformed Messages (5m)",
+      "gridPos": { "h": 6, "w": 6, "x": 12, "y": 46 },
+      "datasource": { "type": "prometheus", "uid": "ds-prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 10 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(clicks_malformed_total{job=\"shrinkr-worker\"}[5m]))",
+          "legendFormat": "Malformed"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Max Consumer Lag",
+      "gridPos": { "h": 6, "w": 6, "x": 18, "y": 46 },
+      "datasource": { "type": "prometheus", "uid": "ds-prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 100 },
+              { "color": "red", "value": 1000 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "colorMode": "background",
+        "graphMode": "area",
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "expr": "max(kafka_consumer_lag{job=\"shrinkr-worker\"})",
+          "legendFormat": "Lag"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Click Throughput (events/s)",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 52 },
+      "datasource": { "type": "prometheus", "uid": "ds-prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(clicks_consumed_total{job=\"shrinkr-worker\"}[1m]))",
+          "legendFormat": "consumed"
+        },
+        {
+          "expr": "sum(rate(clicks_inserted_total{job=\"shrinkr-worker\"}[1m]))",
+          "legendFormat": "inserted"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Flush Duration (p50 / p95 / p99)",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 52 },
+      "datasource": { "type": "prometheus", "uid": "ds-prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 5
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.5, sum(rate(clicks_flush_duration_seconds_bucket{job=\"shrinkr-worker\"}[5m])) by (le))",
+          "legendFormat": "p50"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(clicks_flush_duration_seconds_bucket{job=\"shrinkr-worker\"}[5m])) by (le))",
+          "legendFormat": "p95"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(clicks_flush_duration_seconds_bucket{job=\"shrinkr-worker\"}[5m])) by (le))",
+          "legendFormat": "p99"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Consumer Lag per Partition",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 60 },
+      "datasource": { "type": "prometheus", "uid": "ds-prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "stepAfter",
+            "fillOpacity": 10
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "expr": "kafka_consumer_lag{job=\"shrinkr-worker\"}",
+          "legendFormat": "partition {{partition}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Batch Size (p50 / p95 / p99)",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 60 },
+      "datasource": { "type": "prometheus", "uid": "ds-prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 5
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.5, sum(rate(clicks_batch_size_bucket{job=\"shrinkr-worker\"}[5m])) by (le))",
+          "legendFormat": "p50"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(clicks_batch_size_bucket{job=\"shrinkr-worker\"}[5m])) by (le))",
+          "legendFormat": "p95"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(clicks_batch_size_bucket{job=\"shrinkr-worker\"}[5m])) by (le))",
+          "legendFormat": "p99"
+        }
+      ]
+    },
+    {
+      "type": "logs",
+      "title": "Worker Logs (Loki)",
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 68 },
+      "datasource": { "type": "loki", "uid": "ds-loki" },
+      "options": {
+        "showTime": true,
+        "showLabels": true,
+        "showCommonLabels": false,
+        "wrapLogMessage": true,
+        "sortOrder": "Descending",
+        "enableLogDetails": true
+      },
+      "targets": [
+        {
+          "expr": "{container_name=\"shrinkr-worker\"}",
+          "legendFormat": ""
+        }
+      ]
     }
   ],
   "schemaVersion": 39,
@@ -418,6 +694,6 @@
   "timezone": "browser",
   "title": "Shrinkr API",
   "uid": "shrinkr-api",
-  "version": 3,
+  "version": 4,
   "refresh": "10s"
 }
