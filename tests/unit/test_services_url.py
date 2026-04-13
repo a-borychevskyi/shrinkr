@@ -2,12 +2,13 @@ from datetime import datetime, UTC
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from sqlalchemy.exc import IntegrityError
 
 from src.models.url.entity import UrlModel
 from src.orm.filters.url import UrlFilter
 from src.orm.sorters.url import UrlSortModel
 from src.services.database.url import UrlService
-from src.utils.exceptions.base import NotFound
+from src.utils.exceptions.base import NotFound, ServiceUnavailable
 
 
 SAMPLE_ORM = MagicMock()
@@ -32,7 +33,12 @@ def _make_uow():
     uow = AsyncMock()
     uow.__aenter__ = AsyncMock(return_value=uow)
     uow.__aexit__ = AsyncMock(return_value=False)
-    uow.session = AsyncMock()
+    session = MagicMock()
+    savepoint_cm = AsyncMock()
+    savepoint_cm.__aenter__ = AsyncMock(return_value=savepoint_cm)
+    savepoint_cm.__aexit__ = AsyncMock(return_value=False)
+    session.begin_nested = MagicMock(return_value=savepoint_cm)
+    uow.session = session
     return uow
 
 
@@ -115,11 +121,17 @@ class TestGetAll:
         assert result == []
 
 
+def _integrity_error() -> IntegrityError:
+    return IntegrityError(
+        statement="INSERT INTO urls ...",
+        params={},
+        orig=Exception("duplicate key value violates unique constraint"),
+    )
+
+
 class TestCreate:
-    async def test_creates_url_with_unique_code(self):
+    async def test_creates_url_when_code_is_unique(self):
         repo = _make_repo()
-        repo.get_short_code = MagicMock(return_value="newcode1")
-        repo.get_one = AsyncMock(return_value=None)
         repo.create = AsyncMock(return_value=SAMPLE_ORM)
 
         svc = _make_service(repo=repo)
@@ -128,23 +140,35 @@ class TestCreate:
         assert result.short_code == "abc123"
         repo.create.assert_awaited_once()
 
-    async def test_retries_on_duplicate_code(self):
+    async def test_retries_on_integrity_error_then_succeeds(self):
+        """A unique-constraint collision on short_code should trigger a retry
+        with a fresh code rather than propagating the error."""
         repo = _make_repo()
-        repo.get_short_code = MagicMock(side_effect=["dup", "dup", "unique"])
-        repo.get_one = AsyncMock(side_effect=[SAMPLE_ORM, SAMPLE_ORM, None])
-        repo.create = AsyncMock(return_value=SAMPLE_ORM)
+        repo.create = AsyncMock(
+            side_effect=[_integrity_error(), _integrity_error(), SAMPLE_ORM]
+        )
 
         svc = _make_service(repo=repo)
         result = await svc.create("https://example.com")
 
-        assert result is not None
-        assert repo.get_one.await_count == 3
+        assert result.short_code == "abc123"
+        assert repo.create.await_count == 3
+
+    async def test_raises_service_unavailable_on_exhaustion(self):
+        """After the retry budget is exhausted the service must fail explicitly
+        instead of looping forever."""
+        repo = _make_repo()
+        repo.create = AsyncMock(side_effect=_integrity_error())
+
+        svc = _make_service(repo=repo)
+
+        with pytest.raises(ServiceUnavailable):
+            await svc.create("https://example.com")
 
 
 class TestCreateMany:
     async def test_creates_multiple_urls(self):
         repo = _make_repo()
-        repo.get_short_code = MagicMock(side_effect=["code1", "code2"])
         repo.create_many = AsyncMock(return_value=2)
 
         svc = _make_service(repo=repo)
@@ -152,6 +176,28 @@ class TestCreateMany:
 
         assert result == 2
         repo.create_many.assert_awaited_once()
+        submitted_models = repo.create_many.await_args.kwargs["models"]
+        codes = [m.short_code for m in submitted_models]
+        assert len(codes) == len(set(codes))
+
+    async def test_batch_retries_on_integrity_error(self):
+        repo = _make_repo()
+        repo.create_many = AsyncMock(side_effect=[_integrity_error(), 2])
+
+        svc = _make_service(repo=repo)
+        result = await svc.create_many(["https://a.com", "https://b.com"])
+
+        assert result == 2
+        assert repo.create_many.await_count == 2
+
+    async def test_batch_raises_service_unavailable_on_exhaustion(self):
+        repo = _make_repo()
+        repo.create_many = AsyncMock(side_effect=_integrity_error())
+
+        svc = _make_service(repo=repo)
+
+        with pytest.raises(ServiceUnavailable):
+            await svc.create_many(["https://a.com", "https://b.com"])
 
 
 class TestUpdate:

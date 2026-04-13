@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import time
-from secrets import token_urlsafe
 
 import orjson
 import structlog
@@ -23,10 +22,6 @@ tracer = trace.get_tracer(__name__)
 
 class UrlRepository(BaseDatabaseRepository[Url, UrlFilter, UrlSortModel, UrlModel]):
     __model__ = Url
-
-    @staticmethod
-    def get_short_code() -> str:
-        return token_urlsafe(12)
 
 
 class UrlCacheRepository(StringAbstractRepository[UrlModel]):
