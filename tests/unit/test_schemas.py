@@ -5,7 +5,6 @@ from src.api.v0.shortener.url.schemas import (
     ActivateUrlRequest,
     CreateShortUrlRequest,
     DeactivateUrlRequest,
-    RedirectToUrlRequest,
 )
 from src.api.base import BasePayloadResponse, BaseResponse
 
@@ -22,16 +21,6 @@ class TestCreateShortUrlRequest:
     def test_missing_url_rejected(self):
         with pytest.raises(ValidationError):
             CreateShortUrlRequest()
-
-
-class TestRedirectToUrlRequest:
-    def test_valid(self):
-        req = RedirectToUrlRequest(short_code="abc123")
-        assert req.short_code == "abc123"
-
-    def test_missing_short_code_rejected(self):
-        with pytest.raises(ValidationError):
-            RedirectToUrlRequest()
 
 
 class TestDeactivateUrlRequest:

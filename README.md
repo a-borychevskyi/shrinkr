@@ -72,7 +72,7 @@ All endpoints are versioned under `/v0`.
 | Method | Path | Description |
 |--------|------|-------------|
 | `POST` | `/v0/shortner/` | Create a short link |
-| `GET` | `/v0/shortner/?short_code=abc` | Redirect to the original URL |
+| `GET` | `/{short_code}` | Redirect to the original URL (302) |
 | `POST` | `/v0/shortner/deactivate` | Soft-delete (deactivate) a link |
 | `POST` | `/v0/shortner/activate` | Re-activate a link |
 | `DELETE` | `/v0/shortner/{short_code}` | Permanently delete a link |

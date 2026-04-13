@@ -71,9 +71,7 @@ class TestRedirectToUrl:
         app.dependency_overrides[get_url_stats_service] = lambda: mock_stats
         app.dependency_overrides[get_url_cache_repository] = lambda: mock_cache
 
-        response = await client.get(
-            "/v0/shortner/", params={"short_code": "abc123"}, follow_redirects=False
-        )
+        response = await client.get("/abc123", follow_redirects=False)
 
         assert response.status_code == 302
         assert response.headers["location"] == "/"
@@ -90,9 +88,7 @@ class TestRedirectToUrl:
         app.dependency_overrides[get_url_stats_service] = lambda: mock_stats
         app.dependency_overrides[get_url_cache_repository] = lambda: mock_cache
 
-        response = await client.get(
-            "/v0/shortner/", params={"short_code": "abc123"}, follow_redirects=False
-        )
+        response = await client.get("/abc123", follow_redirects=False)
 
         assert response.status_code == 302
         assert response.headers["location"] == "https://example.com"
@@ -110,9 +106,7 @@ class TestRedirectToUrl:
         app.dependency_overrides[get_url_stats_service] = lambda: mock_stats
         app.dependency_overrides[get_url_cache_repository] = lambda: mock_cache
 
-        response = await client.get(
-            "/v0/shortner/", params={"short_code": "abc123"}, follow_redirects=False
-        )
+        response = await client.get("/abc123", follow_redirects=False)
 
         assert response.status_code == 302
         assert response.headers["location"] == "https://example.com"
@@ -130,9 +124,7 @@ class TestRedirectToUrl:
         app.dependency_overrides[get_url_stats_service] = lambda: mock_stats
         app.dependency_overrides[get_url_cache_repository] = lambda: mock_cache
 
-        response = await client.get(
-            "/v0/shortner/", params={"short_code": "nonexistent"}
-        )
+        response = await client.get("/nonexistent")
 
         assert response.status_code == 404
         body = response.json()
@@ -151,8 +143,7 @@ class TestRedirectToUrl:
         app.dependency_overrides[get_url_cache_repository] = lambda: mock_cache
 
         await client.get(
-            "/v0/shortner/",
-            params={"short_code": "abc123"},
+            "/abc123",
             headers={"user-agent": "TestBot/1.0"},
             follow_redirects=False,
         )
@@ -161,10 +152,11 @@ class TestRedirectToUrl:
         assert call_kwargs["user_agent"] == "TestBot/1.0"
         assert call_kwargs["url_id"] == 1
 
-    async def test_redirect_missing_short_code(self, client: AsyncClient):
-        response = await client.get("/v0/shortner/")
-
-        assert response.status_code == 422
+    async def test_redirect_does_not_shadow_api_routes(self, client: AsyncClient):
+        # The catch-all redirect must not intercept /docs, /openapi.json,
+        # or /v0/* routes.
+        docs_response = await client.get("/docs", follow_redirects=False)
+        assert docs_response.status_code == 200
 
 
 # --- Stats endpoint ---

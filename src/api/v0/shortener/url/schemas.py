@@ -3,12 +3,6 @@ from pydantic import Field, HttpUrl
 from src.api.base import BaseRequest, BaseResponse
 
 
-class RedirectToUrlRequest(BaseRequest):
-    short_code: str = Field(
-        ..., description="The short code to redirect to the target URL"
-    )
-
-
 class DeactivateUrlRequest(BaseRequest):
     short_code: str = Field(..., description="The short code to deactivate")
 

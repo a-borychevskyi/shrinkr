@@ -32,14 +32,15 @@ class TestAppFactory:
 
 class TestExceptionHandlers:
     async def test_http_404_returns_json(self, client: AsyncClient):
-        response = await client.get("/nonexistent-path")
+        # Multi-segment path so it does not match the /{short_code} redirect.
+        response = await client.get("/v0/nonexistent-path")
 
         assert response.status_code == 404
         body = response.json()
         assert body["errors"][0]["type"] == "NOT_FOUND"
 
     async def test_http_404_includes_error_class(self, client: AsyncClient):
-        response = await client.get("/nonexistent-path")
+        response = await client.get("/v0/nonexistent-path")
 
         body = response.json()
         assert "errorClass" in body["errors"][0]
@@ -69,7 +70,7 @@ class TestExceptionHandlers:
 
         transport = ASGITransport(app=app, raise_app_exceptions=False)
         async with AsyncClient(transport=transport, base_url="http://test") as ac:
-            response = await ac.get("/v0/shortner/", params={"short_code": "abc123"})
+            response = await ac.get("/abc123")
 
         assert response.status_code == 500
         body = response.json()
