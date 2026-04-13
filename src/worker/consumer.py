@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import asyncio
 import threading
+from concurrent.futures import TimeoutError as FuturesTimeoutError
 from time import perf_counter
 from typing import Any, Protocol
 
@@ -38,13 +39,14 @@ logger = structlog.get_logger(__name__)
 
 class _KafkaConsumerProtocol(Protocol):
     def poll(self, timeout: float) -> Any: ...
-    def commit(self, message: Any = None, asynchronous: bool = True) -> None: ...
+    def commit(self, message: Any = None, asynchronous: bool = True) -> Any: ...
     def close(self) -> None: ...
     def assignment(self) -> list[Any]: ...
     def get_watermark_offsets(
         self, partition: Any, timeout: float = 5.0
     ) -> tuple[int, int]: ...
     def position(self, partitions: list[Any]) -> list[Any]: ...
+    def committed(self, partitions: list[Any], timeout: float = 5.0) -> list[Any]: ...
 
 
 class ClickConsumer:
@@ -55,6 +57,7 @@ class ClickConsumer:
         batch_size: int,
         flush_interval_seconds: float,
         poll_timeout_seconds: float = 0.5,
+        flush_timeout_seconds: float = 30.0,
     ) -> None:
         self._consumer = consumer
         self._repository = repository
@@ -62,6 +65,7 @@ class ClickConsumer:
             max_size=batch_size, max_linger_seconds=flush_interval_seconds
         )
         self._poll_timeout = poll_timeout_seconds
+        self._flush_timeout = flush_timeout_seconds
         self._stop = threading.Event()
 
     def stop(self) -> None:
@@ -91,16 +95,40 @@ class ClickConsumer:
     def _submit_flush(
         self, loop: asyncio.AbstractEventLoop, batch: list[ClickEvent]
     ) -> None:
-        """Bridge a batch from the poll thread to the asyncio loop, blocking on completion."""
+        """Bridge a batch from the poll thread to the asyncio loop, blocking on completion.
+
+        All confluent_kafka.Consumer calls (poll, commit, close, etc.) MUST happen
+        on this poll thread — librdkafka is not documented to be thread-safe for
+        cross-thread Consumer calls. We bridge the async insert to the asyncio
+        loop, but the post-insert commit happens here, on the poll thread.
+        """
         future = asyncio.run_coroutine_threadsafe(self._flush_batch(batch), loop)
         try:
-            future.result()  # Block — we want backpressure, not parallel flushes.
+            future.result(timeout=self._flush_timeout)
+        except FuturesTimeoutError:
+            logger.warning(
+                "click_flush_timed_out",
+                batch_size=len(batch),
+                timeout_seconds=self._flush_timeout,
+            )
+            # Do not commit; offsets re-read on next poll.
+            return
         except Exception:
             logger.exception("click_flush_failed", batch_size=len(batch))
-            # Don't commit; next poll re-reads same offsets.
-        self._update_lag_gauge()
+            # Do not commit; offsets re-read on next poll.
+            return
+        else:
+            # Insert succeeded; commit on this (poll) thread.
+            self._consumer.commit(asynchronous=False)
+        finally:
+            self._update_lag_gauge()
 
     async def _flush_batch(self, batch: list[ClickEvent]) -> None:
+        """Insert a batch via the async repository.
+
+        Does NOT commit — that's done by _submit_flush on the poll thread
+        after this coroutine completes successfully.
+        """
         if not batch:
             return
         CLICKS_BATCH_SIZE.observe(len(batch))
@@ -108,8 +136,6 @@ class ClickConsumer:
         await self._repository.insert_many(batch)
         CLICKS_FLUSH_DURATION_SECONDS.observe(perf_counter() - start)
         CLICKS_INSERTED_TOTAL.inc(len(batch))
-        # Only commit after successful insert — at-least-once semantics.
-        self._consumer.commit(asynchronous=False)
 
     def _decode_or_skip(self, msg: Any) -> ClickEvent | None:
         try:
@@ -130,13 +156,14 @@ class ClickConsumer:
             assignment = self._consumer.assignment()
             if not assignment:
                 return
-            positions = self._consumer.position(assignment)
-            for tp in positions:
+            committed = self._consumer.committed(assignment, timeout=1.0)
+            for tp in committed:
                 _, high = self._consumer.get_watermark_offsets(tp, timeout=1.0)
-                committed_or_position = tp.offset if tp.offset >= 0 else 0
+                # tp.offset == -1001 means no committed offset yet for this partition.
+                committed_offset = tp.offset if tp.offset >= 0 else 0
                 KAFKA_CONSUMER_LAG.labels(partition=str(tp.partition)).set(
-                    max(high - committed_or_position, 0)
+                    max(high - committed_offset, 0)
                 )
         except Exception:
             # Lag metric is best-effort; never crash the loop.
-            logger.debug("click_lag_metric_update_failed", exc_info=True)
+            logger.warning("click_lag_metric_update_failed", exc_info=True)

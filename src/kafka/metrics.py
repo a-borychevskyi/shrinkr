@@ -33,7 +33,7 @@ CLICKS_INSERTED_TOTAL = Counter(
 
 CLICKS_MALFORMED_TOTAL = Counter(
     "clicks_malformed_total",
-    "Number of malformed click events skipped by the worker",
+    "Number of malformed click events skipped by the worker (subset of clicks_consumed_total — every poll is counted, decoded or not)",
 )
 
 CLICKS_BATCH_SIZE = Histogram(
