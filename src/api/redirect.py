@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, BackgroundTasks, Request
 from fastapi.params import Depends
 from fastapi.responses import RedirectResponse
 from opentelemetry import trace
@@ -26,6 +26,7 @@ tracer = trace.get_tracer(__name__)
 async def redirect_to_url(
     short_code: str,
     request: Request,
+    background_tasks: BackgroundTasks,
     url_service: Annotated[UrlService, Depends(get_url_service)],
     url_cache_repository: Annotated[
         UrlCacheRepository, Depends(get_url_cache_repository)
@@ -54,7 +55,8 @@ async def redirect_to_url(
     _id = response.id if response.id is not None else -1
     ip_address = request.client.host if request.client is not None else "unknown"
     user_agent = request.headers.get("user-agent", "unknown")
-    await url_stats_service.create(
+    background_tasks.add_task(
+        url_stats_service.create,
         url_id=_id,
         user_agent=user_agent,
         ip_address=ip_address,
