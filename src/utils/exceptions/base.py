@@ -139,3 +139,12 @@ class ExternalServiceError(BaseApplicationException):
 
     def to_error_response(self) -> ServiceErrorModel:
         return super().to_error_response()
+
+
+class ServiceUnavailable(BaseApplicationException):
+    literal = "SERVICE_UNAVAILABLE"
+    status_code: int = 503
+    report_to_sentry: bool = True
+
+    def to_error_response(self) -> ServiceErrorModel:
+        return super().to_error_response()

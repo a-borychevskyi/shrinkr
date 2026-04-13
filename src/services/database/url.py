@@ -2,6 +2,7 @@ from datetime import UTC, datetime
 
 import structlog
 from opentelemetry import trace
+from sqlalchemy.exc import IntegrityError
 
 from src.models.base import ManyCustomResponse
 from src.models.url.entity import UrlModel
@@ -10,10 +11,14 @@ from src.orm.models import Url
 from src.orm.sorters.url import UrlSortModel
 from src.repositories.uow import UnitOfWork
 from src.repositories.url import UrlRepository
-from src.utils.exceptions.base import NotFound
+from src.utils.exceptions.base import NotFound, ServiceUnavailable
+from src.utils.shortcode import generate_short_code
 
 logger = structlog.get_logger(__name__)
 tracer = trace.get_tracer(__name__)
+
+_MAX_CREATE_ATTEMPTS: int = 5
+_MAX_CREATE_MANY_ATTEMPTS: int = 3
 
 
 class UrlService:
@@ -66,41 +71,72 @@ class UrlService:
             attributes={"url.target_url": target_url},
         ) as span:
             async with self.uow as uow:
-                attempts = 0
-                while True:
-                    attempts += 1
-                    short_code = self.url_repository.get_short_code()
-                    existing = await self.url_repository.get_one(
-                        filters=UrlFilter(short_code=short_code),
-                        async_session=uow.session,
-                    )
-                    if not existing:
-                        break
+                for attempt in range(1, _MAX_CREATE_ATTEMPTS + 1):
+                    short_code = generate_short_code()
+                    model = UrlModel(target_url=target_url, short_code=short_code)
+                    try:
+                        async with uow.session.begin_nested():
+                            result = await self.url_repository.create(
+                                model=model, async_session=uow.session
+                            )
+                    except IntegrityError:
+                        logger.info(
+                            "short_code_collision",
+                            short_code=short_code,
+                            attempt=attempt,
+                        )
+                        continue
 
-                span.set_attribute("url.short_code", short_code)
-                span.set_attribute("url.generation_attempts", attempts)
+                    span.set_attribute("url.short_code", short_code)
+                    span.set_attribute("url.generation_attempts", attempt)
+                    return UrlModel.model_validate(result)
 
-                model = UrlModel(target_url=target_url, short_code=short_code)
-                result = await self.url_repository.create(
-                    model=model, async_session=uow.session
+                logger.error(
+                    "short_code_exhausted_attempts",
+                    attempts=_MAX_CREATE_ATTEMPTS,
                 )
-                return UrlModel.model_validate(result)
+                raise ServiceUnavailable(
+                    message="Unable to generate a unique short code; please retry.",
+                )
 
     async def create_many(self, target_urls: list[str]) -> int:
         with tracer.start_as_current_span(
             "UrlService.create_many",
             attributes={"url.batch_size": len(target_urls)},
-        ):
+        ) as span:
             async with self.uow as uow:
-                models = [
-                    UrlModel(
-                        target_url=url,
-                        short_code=self.url_repository.get_short_code(),
-                    )
-                    for url in target_urls
-                ]
-                return await self.url_repository.create_many(
-                    models=models, async_session=uow.session
+                for attempt in range(1, _MAX_CREATE_MANY_ATTEMPTS + 1):
+                    codes: set[str] = set()
+                    while len(codes) < len(target_urls):
+                        codes.add(generate_short_code())
+
+                    models = [
+                        UrlModel(target_url=url, short_code=code)
+                        for url, code in zip(target_urls, codes, strict=True)
+                    ]
+                    try:
+                        async with uow.session.begin_nested():
+                            rowcount = await self.url_repository.create_many(
+                                models=models, async_session=uow.session
+                            )
+                    except IntegrityError:
+                        logger.info(
+                            "short_code_batch_collision",
+                            batch_size=len(target_urls),
+                            attempt=attempt,
+                        )
+                        continue
+
+                    span.set_attribute("url.generation_attempts", attempt)
+                    return rowcount
+
+                logger.error(
+                    "short_code_batch_exhausted_attempts",
+                    attempts=_MAX_CREATE_MANY_ATTEMPTS,
+                    batch_size=len(target_urls),
+                )
+                raise ServiceUnavailable(
+                    message="Unable to generate unique short codes for batch; please retry.",
                 )
 
     async def update(self, model: UrlModel) -> UrlModel:
