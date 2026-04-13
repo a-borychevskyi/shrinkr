@@ -24,6 +24,9 @@ dependencies = [
     "opentelemetry-instrumentation-fastapi>=0.54b0",
     "opentelemetry-instrumentation-sqlalchemy>=0.54b0",
     "opentelemetry-instrumentation-redis>=0.54b0",
+    "confluent-kafka>=2.5.0",
+    "starlette>=0.40.0",
+    "prometheus-client>=0.21.0",
 ]
 
 [dependency-groups]
@@ -35,7 +38,7 @@ dev = [
     "pytest-asyncio>=0.25.0",
     "pytest-cov>=6.0.0",
     "httpx>=0.28.0",
-    "testcontainers[postgres,redis]>=4.0.0",
+    "testcontainers[postgres,redis,kafka]>=4.0.0",
 ]
 docs = [
     "furo>=2025.12.19",
@@ -48,6 +51,9 @@ load = [
     "locust>=2.31.0",
     "prometheus-client>=0.21.0",
 ]
+
+[project.scripts]
+shrinkr-worker = "src.worker.main:run"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
