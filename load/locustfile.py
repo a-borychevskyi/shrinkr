@@ -104,7 +104,7 @@ class RedirectUser(FastHttpUser):
             ) as response:
                 if response.status_code == 201:
                     code = response.json().get("payload", {}).get("short_code")
-                    if code:
+                    if isinstance(code, str) and code:
                         self.codes.append(code)
                         response.success()
                     else:
