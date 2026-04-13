@@ -1,5 +1,5 @@
 from collections.abc import AsyncIterator
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from fastapi import FastAPI
@@ -7,7 +7,9 @@ from httpx import ASGITransport, AsyncClient
 
 from src.api.exceptions import ExceptionHandler
 from src.api.v0 import v0_router
+from src.config.rate_limiter import RateLimiterConfig
 from src.di.clients.redis import get_async_redis_client
+from src.di.rate_limiter import get_rate_limiter_config
 from src.di.repositories.url import get_url_cache_repository
 from src.di.services.url import get_url_service
 from src.di.services.url_stats import get_url_stats_service
@@ -24,7 +26,19 @@ def _make_redis_mock(
     return mock
 
 
-def create_rate_limit_test_app(redis_mock: AsyncMock) -> FastAPI:
+def _make_rate_limiter_config(*, enabled: bool = True) -> RateLimiterConfig:
+    return RateLimiterConfig(
+        REDIS_HOST="test",
+        REDIS_PORT=6379,
+        REDIS_DB=0,
+        APP_PREFIX="shrinkr",
+        RATE_LIMIT_ENABLED=enabled,
+    )
+
+
+def create_rate_limit_test_app(
+    redis_mock: AsyncMock, *, rate_limit_enabled: bool = True
+) -> FastAPI:
     app = FastAPI()
     app.include_router(v0_router)
     ExceptionHandler(app).register_handlers()
@@ -32,6 +46,9 @@ def create_rate_limit_test_app(redis_mock: AsyncMock) -> FastAPI:
 
     app.dependency_overrides[get_async_redis_client] = lambda: redis_mock
     app.dependency_overrides[get_url_cache_repository] = lambda: AsyncMock()
+    app.dependency_overrides[get_rate_limiter_config] = lambda: (
+        _make_rate_limiter_config(enabled=rate_limit_enabled)
+    )
 
     mock_url_service = AsyncMock()
     mock_url_service.create.return_value = MagicMock(short_code="abc123")
@@ -121,31 +138,22 @@ class TestRateLimitBlocked:
 
 class TestRateLimitDisabled:
     async def test_disabled_skips_rate_limiting(self):
-        """When rate limiting is disabled, redis.eval must not be called and
-        the request should succeed regardless of what the Lua script would return.
+        """When rate limiting is disabled via config, redis.eval must not be
+        called and requests should succeed regardless of what the Lua script
+        would have returned.
 
-        RateLimiter instances are created at module-import time, so we cannot use
-        monkeypatch.setenv to flip RATE_LIMIT_ENABLED after the fact. Instead we
-        patch ``RateLimiter.__call__`` to a no-op coroutine for the duration of
-        this test, which simulates the limiter being fully disabled.
+        With config injected as a FastAPI dependency, disabling the limiter is
+        a clean override — no need to monkey-patch ``RateLimiter.__call__``.
         """
         redis_mock = _make_redis_mock(allowed=0, remaining=0)
-        app = create_rate_limit_test_app(redis_mock)
+        app = create_rate_limit_test_app(redis_mock, rate_limit_enabled=False)
 
-        from src.di.rate_limiter import RateLimiter
-
-        async def _noop(self, request, response, redis):  # noqa: ARG001
-            return None
-
-        with patch.object(RateLimiter, "__call__", new=_noop):
-            transport = ASGITransport(app=app)
-            async with AsyncClient(
-                transport=transport, base_url="http://test"
-            ) as client:
-                resp = await client.post(
-                    "/v0/shortner/",
-                    json={"target_url": "https://example.com"},
-                )
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            resp = await client.post(
+                "/v0/shortner/",
+                json={"target_url": "https://example.com"},
+            )
 
         assert resp.status_code != 429
         redis_mock.eval.assert_not_called()

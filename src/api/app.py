@@ -6,12 +6,16 @@ from src.api.exceptions import ExceptionHandler
 from src.api.redirect import router as redirect_router
 from src.api.v0 import v0_router
 from src.di.orm.database import get_db
+from src.di.rate_limiter import get_rate_limiter_config
 from src.logging import setup_logging
 from src.telemetry import instrument_app, setup_telemetry
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Touch the rate-limiter config on startup so missing/invalid env vars
+    # raise immediately instead of surfacing on the first rate-limited request.
+    get_rate_limiter_config()
     app.state.db = get_db()
     yield
     await app.state.db.stop()
