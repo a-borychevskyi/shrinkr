@@ -86,25 +86,6 @@ class UrlStatsService:
                 )
                 return [UrlStatsModel.model_validate(row) for row in results]
 
-    async def create(
-        self, url_id: int, user_agent: str, ip_address: str
-    ) -> UrlStatsModel:
-        with tracer.start_as_current_span(
-            "UrlStatsService.create",
-            attributes={
-                "url_stats.url_id": url_id,
-                "url_stats.ip_address": ip_address,
-            },
-        ):
-            async with self.uow as uow:
-                model = UrlStatsModel(
-                    url_id=url_id, user_agent=user_agent, ip_address=ip_address
-                )
-                result = await self.url_stats_repository.create(
-                    model=model, async_session=uow.session
-                )
-                return UrlStatsModel.model_validate(result)
-
     async def create_many(self, models: list[UrlStatsModel]) -> int:
         with tracer.start_as_current_span(
             "UrlStatsService.create_many",

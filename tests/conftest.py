@@ -31,6 +31,7 @@ def create_test_app() -> FastAPI:
     app.include_router(redirect_router)
     ExceptionHandler(app).register_handlers()
     app.state.db = MagicMock()
+    app.state.click_ingester = MagicMock()
     app.dependency_overrides[get_url_cache_repository] = lambda: AsyncMock()
     app.dependency_overrides[get_async_redis_client] = lambda: AsyncMock()
     app.dependency_overrides[get_rate_limiter_config] = _test_rate_limiter_config

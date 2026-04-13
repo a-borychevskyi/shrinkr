@@ -8,6 +8,7 @@ from src.api.v0 import v0_router
 from src.di.orm.database import get_db
 from src.di.rate_limiter import get_rate_limiter_config
 from src.logging import setup_logging
+from src.services.click_ingest import ClickIngester
 from src.telemetry import instrument_app, setup_telemetry
 
 
@@ -17,7 +18,10 @@ async def lifespan(app: FastAPI):
     # raise immediately instead of surfacing on the first rate-limited request.
     get_rate_limiter_config()
     app.state.db = get_db()
+    app.state.click_ingester = ClickIngester(engine=app.state.db.async_engine)
+    await app.state.click_ingester.start()
     yield
+    await app.state.click_ingester.stop()
     await app.state.db.stop()
 
 
