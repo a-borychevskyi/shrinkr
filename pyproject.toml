@@ -1,5 +1,5 @@
 [project]
-name = "url-shortner"
+name = "shrinkr"
 version = "0.1.0"
 description = "A simple URL shortener built with FastAPI"
 readme = "README.md"
