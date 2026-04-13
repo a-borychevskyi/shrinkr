@@ -1,6 +1,6 @@
 # Shrinkr
 
-[![CI](https://github.com/a-borychevskyi/url-shortener/actions/workflows/ci.yml/badge.svg)](https://github.com/a-borychevskyi/url-shortener/actions/workflows/ci.yml)
+[![CI](https://github.com/a-borychevskyi/shrinkr/actions/workflows/ci.yml/badge.svg)](https://github.com/a-borychevskyi/shrinkr/actions/workflows/ci.yml)
 
 A production-grade URL shortener with analytics and full observability, built to demonstrate backend and DevOps skills.
 
@@ -49,8 +49,8 @@ graph LR
 
 ```bash
 # Clone and start all services
-git clone https://github.com/a-borychevskyi/url-shortener.git
-cd url-shortener
+git clone https://github.com/a-borychevskyi/shrinkr.git
+cd shrinkr
 docker compose -f docker/compose.yml up --build
 ```
 
@@ -198,6 +198,21 @@ The `Dockerfile` uses a **multi-stage build**:
 
 Production entrypoint: Gunicorn with 4 Uvicorn workers.
 
+## CI/CD
+
+GitHub Actions pipeline (`.github/workflows/ci.yml`) runs on every push to `main` and every pull request.
+
+| Job | Runs | Purpose |
+|-----|------|---------|
+| `lint` | `ruff check` + `ruff format --check` on `src/` and `tests/` | Style and formatting |
+| `typecheck` | `mypy` (configured via `pyproject.toml`) | Static type analysis |
+| `test` | `pytest` with 70% coverage gate | Unit, API, and integration tests (testcontainers spins up real Postgres + Redis) |
+| `build-and-push` | Docker Buildx multi-stage build; push to GHCR on `main` | Container delivery |
+
+`lint`, `typecheck`, and `test` run in parallel for fast feedback. `build-and-push` gates on all three passing. Push to the registry is skipped on pull requests — PRs only validate the build.
+
+Pre-commit hooks (`ruff-format`, `ruff`, `mypy`) mirror the `lint` and `typecheck` jobs so most failures surface locally before a commit lands.
+
 ## Documentation
 
 Sphinx-based documentation with auto-generated API reference:
@@ -216,7 +231,6 @@ python -m http.server -d docs/_build/html 8080
 ## What I'd Improve
 
 - **Authentication** — API key or JWT-based auth for link management.
-- **CI/CD pipeline** — GitHub Actions for lint, test, build, and push to GHCR.
 - **Terraform** — AWS infrastructure as code (VPC, RDS, ElastiCache, ECS Fargate, ALB).
 - **Kubernetes** — Deployment manifests, Helm chart, HPA autoscaling.
 - **Analytics pipeline** — Kafka for async click ingestion, ClickHouse for analytical queries.
