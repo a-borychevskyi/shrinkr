@@ -26,6 +26,9 @@ services:
       - WEB_CONCURRENCY=8
       - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
       - KAFKA_CLICKS_TOPIC=clicks
+      - PYROSCOPE_ENABLED=true
+      - PYROSCOPE_SERVER_ADDRESS=http://pyroscope:4040
+      - PYROSCOPE_SAMPLE_RATE=100
     depends_on:
       postgres:
         condition: service_started
@@ -64,6 +67,9 @@ services:
       - OTEL_ENABLED=true
       - OTEL_SERVICE_NAME=shrinkr-worker
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - PYROSCOPE_ENABLED=true
+      - PYROSCOPE_SERVER_ADDRESS=http://pyroscope:4040
+      - PYROSCOPE_SAMPLE_RATE=100
     ports:
       - "8001:8001"
     depends_on:
@@ -151,6 +157,19 @@ services:
     environment:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=admin
+    networks:
+      - monitoring
+
+  # No depends_on wiring: the app/worker push profiles fire-and-forget, so
+  # their startup must not block on Pyroscope readiness.
+  pyroscope:
+    image: grafana/pyroscope:latest
+    container_name: pyroscope
+    restart: unless-stopped
+    ports:
+      - "4040:4040"
+    volumes:
+      - pyroscope-data:/data
     networks:
       - monitoring
 
@@ -248,6 +267,7 @@ volumes:
   redis-data:
   redisinsight-data:
   kafka-data:
+  pyroscope-data:
 
 networks:
   monitoring:

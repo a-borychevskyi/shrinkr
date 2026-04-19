@@ -27,6 +27,7 @@ dependencies = [
     "confluent-kafka>=2.5.0",
     "starlette>=0.40.0",
     "prometheus-client>=0.21.0",
+    "pyroscope-io>=0.8.0; sys_platform != 'win32'",
 ]
 
 [dependency-groups]
@@ -39,6 +40,7 @@ dev = [
     "pytest-cov>=6.0.0",
     "httpx>=0.28.0",
     "testcontainers[postgres,redis,kafka]>=4.0.0",
+    "py-spy>=0.3.14",
 ]
 docs = [
     "furo>=2025.12.19",
@@ -86,4 +88,12 @@ ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = "prometheus_client.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "opentelemetry.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "pyroscope.*"
 ignore_missing_imports = true

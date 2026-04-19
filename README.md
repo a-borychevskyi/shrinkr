@@ -188,6 +188,7 @@ The full monitoring stack runs alongside the app in Docker Compose:
 - **Structured logging** — structlog outputs JSON in production and pretty-printed logs in development. Logs are scraped by Promtail and aggregated in Loki.
 - **Distributed tracing** — OpenTelemetry auto-instruments FastAPI, SQLAlchemy, and Redis. Traces are exported via OTLP to Jaeger through the OTel Collector.
 - **Metrics** — Prometheus scrapes application metrics (cache hit/miss rates, DB operation counts, rate-limit rejections). Four pre-built Grafana dashboards ship with the project: application overview, Redis metrics, SQL metrics, and a load-testing dashboard (see *Performance*).
+- **Profiling:** Continuous CPU profiling via Grafana Pyroscope. See [docs/profiling.md](docs/profiling.md).
 
 ## Performance
 
