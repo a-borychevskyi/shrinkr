@@ -28,6 +28,7 @@ services:
       - KAFKA_CLICKS_TOPIC=clicks
       - PYROSCOPE_ENABLED=true
       - PYROSCOPE_SERVER_ADDRESS=http://pyroscope:4040
+      - PYROSCOPE_SAMPLE_RATE=100
     depends_on:
       postgres:
         condition: service_started
@@ -68,6 +69,7 @@ services:
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
       - PYROSCOPE_ENABLED=true
       - PYROSCOPE_SERVER_ADDRESS=http://pyroscope:4040
+      - PYROSCOPE_SAMPLE_RATE=100
     ports:
       - "8001:8001"
     depends_on:
@@ -158,6 +160,8 @@ services:
     networks:
       - monitoring
 
+  # No depends_on wiring: the app/worker push profiles fire-and-forget, so
+  # their startup must not block on Pyroscope readiness.
   pyroscope:
     image: grafana/pyroscope:latest
     container_name: pyroscope
