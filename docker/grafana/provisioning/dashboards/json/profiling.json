@@ -1,0 +1,53 @@
+{
+  "annotations": {"list": []},
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "liveNow": false,
+  "panels": [
+    {
+      "datasource": {"type": "grafana-pyroscope-datasource", "uid": "ds-pyroscope"},
+      "gridPos": {"h": 14, "w": 12, "x": 0, "y": 0},
+      "id": 1,
+      "title": "API CPU flamegraph (last 15m)",
+      "type": "flamegraph",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {"type": "grafana-pyroscope-datasource", "uid": "ds-pyroscope"},
+          "profileTypeId": "process_cpu:cpu:nanoseconds:cpu:nanoseconds",
+          "labelSelector": "{service_name=\"shrinkr\"}",
+          "groupBy": []
+        }
+      ]
+    },
+    {
+      "datasource": {"type": "grafana-pyroscope-datasource", "uid": "ds-pyroscope"},
+      "gridPos": {"h": 14, "w": 12, "x": 12, "y": 0},
+      "id": 2,
+      "title": "Worker CPU flamegraph (last 15m)",
+      "type": "flamegraph",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {"type": "grafana-pyroscope-datasource", "uid": "ds-pyroscope"},
+          "profileTypeId": "process_cpu:cpu:nanoseconds:cpu:nanoseconds",
+          "labelSelector": "{service_name=\"shrinkr-worker\"}",
+          "groupBy": []
+        }
+      ]
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 38,
+  "style": "dark",
+  "tags": ["shrinkr", "profiling"],
+  "templating": {"list": []},
+  "time": {"from": "now-15m", "to": "now"},
+  "timepicker": {},
+  "timezone": "",
+  "title": "Shrinkr \u2014 Profiling",
+  "uid": "shrinkr-profiling",
+  "version": 1,
+  "weekStart": ""
+}
