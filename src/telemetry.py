@@ -1,3 +1,7 @@
+import os
+import socket
+
+import structlog
 from opentelemetry import metrics, trace
 from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
@@ -11,6 +15,14 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
 from src.config.otel import OtelConfig
+from src.config.profiling import ProfilingConfig
+
+try:
+    import pyroscope  # type: ignore[import-not-found]
+except ImportError:  # pragma: no cover - win32 has no pyroscope-io wheels
+    pyroscope = None  # type: ignore[assignment]
+
+logger = structlog.get_logger(__name__)
 
 
 def setup_telemetry() -> None:
@@ -18,6 +30,7 @@ def setup_telemetry() -> None:
     config = OtelConfig()
 
     if not config.OTEL_ENABLED:
+        setup_profiling()
         return
 
     resource = Resource.create({"service.name": config.OTEL_SERVICE_NAME})
@@ -42,6 +55,8 @@ def setup_telemetry() -> None:
     RedisInstrumentor().instrument()
     SQLAlchemyInstrumentor().instrument()
 
+    setup_profiling()
+
 
 def instrument_app(app):  # noqa: ANN001
     """Instrument a FastAPI app instance. Call after app creation."""
@@ -51,3 +66,44 @@ def instrument_app(app):  # noqa: ANN001
         return
 
     FastAPIInstrumentor.instrument_app(app)
+
+
+def _detect_role() -> str:
+    service_name = os.environ.get("OTEL_SERVICE_NAME", "")
+    if service_name.endswith("-worker"):
+        return "worker"
+    if service_name:
+        return "api"
+    return "unknown"
+
+
+def setup_profiling() -> None:
+    """Start Pyroscope continuous profiling. No-op when disabled or unavailable."""
+    profiling_config = ProfilingConfig()
+    if not profiling_config.PYROSCOPE_ENABLED:
+        return
+    if pyroscope is None:
+        logger.warning("pyroscope_module_unavailable")
+        return
+
+    otel_config = OtelConfig()
+    tags = {
+        "env": os.environ.get("APP_ENVIRONMENT", "unknown"),
+        "instance": socket.gethostname(),
+        "role": _detect_role(),
+    }
+
+    try:
+        pyroscope.configure(
+            application_name=otel_config.OTEL_SERVICE_NAME,
+            server_address=profiling_config.PYROSCOPE_SERVER_ADDRESS,
+            sample_rate=profiling_config.PYROSCOPE_SAMPLE_RATE,
+            tags=tags,
+        )
+        logger.info(
+            "pyroscope_configured",
+            application=otel_config.OTEL_SERVICE_NAME,
+            server=profiling_config.PYROSCOPE_SERVER_ADDRESS,
+        )
+    except Exception:
+        logger.warning("pyroscope_setup_failed", exc_info=True)
