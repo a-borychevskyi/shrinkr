@@ -22,3 +22,10 @@ datasources:
     access: proxy
     url: http://jaeger:16686
     editable: false
+
+  - name: Pyroscope
+    uid: ds-pyroscope
+    type: grafana-pyroscope-datasource
+    access: proxy
+    url: http://pyroscope:4040
+    editable: false
