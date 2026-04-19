@@ -14,6 +14,11 @@ from src.di.rate_limiter import get_rate_limiter_config
 from src.di.repositories.url import get_url_cache_repository
 
 
+@pytest.fixture(autouse=True)
+def _disable_profiling_in_tests(monkeypatch):
+    monkeypatch.setenv("PYROSCOPE_ENABLED", "false")
+
+
 def _test_rate_limiter_config() -> RateLimiterConfig:
     # Construct explicitly so tests don't depend on the process environment
     # or a .env file being present (CI runs have neither).
