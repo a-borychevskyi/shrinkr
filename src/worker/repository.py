@@ -19,6 +19,11 @@ from src.orm.models import UrlStats
 class UrlStatsBulkRepository:
     def __init__(self, engine: AsyncEngine) -> None:
         self._engine = engine
+        # Reuse a single insert() statement across flushes. Rebuilding
+        # it per call allocates Column introspection state every time;
+        # SQLAlchemy's compiled-statement cache keys on structure so the
+        # saved work is modest, but the allocation is pure waste.
+        self._insert_stmt = insert(UrlStats)
 
     async def insert_many(self, events: list[ClickEvent]) -> None:
         if not events:
@@ -35,4 +40,4 @@ class UrlStatsBulkRepository:
             for event in events
         ]
         async with self._engine.begin() as conn:
-            await conn.execute(insert(UrlStats), rows)
+            await conn.execute(self._insert_stmt, rows)

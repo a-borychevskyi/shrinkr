@@ -1,3 +1,4 @@
+import os
 import socket
 
 import structlog
@@ -12,6 +13,7 @@ from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.sdk.trace.sampling import ParentBased, TraceIdRatioBased
 
 from src.config.app import AppConfig
 from src.config.otel import OtelConfig
@@ -33,10 +35,23 @@ def setup_telemetry() -> None:
         setup_profiling()
         return
 
-    resource = Resource.create({"service.name": config.OTEL_SERVICE_NAME})
+    # Every gunicorn worker is a separate process with its own cumulative
+    # counters. Without a distinct service.instance.id the collector
+    # collapses them into one time series, which appears to reset each
+    # time a different worker exports — making rate() useless. Hostname
+    # + PID gives one series per worker that Prometheus can sum().
+    resource = Resource.create(
+        {
+            "service.name": config.OTEL_SERVICE_NAME,
+            "service.instance.id": f"{socket.gethostname()}:{os.getpid()}",
+        }
+    )
 
-    # Traces
-    trace_provider = TracerProvider(resource=resource)
+    # Traces — head-based sampling. ParentBased means once a trace is
+    # sampled (or not) at the entry point, child spans inherit the
+    # decision, so partial traces are never exported.
+    sampler = ParentBased(root=TraceIdRatioBased(config.OTEL_TRACES_SAMPLER_RATIO))
+    trace_provider = TracerProvider(resource=resource, sampler=sampler)
     trace_provider.add_span_processor(
         BatchSpanProcessor(
             OTLPSpanExporter(endpoint=config.OTEL_EXPORTER_OTLP_ENDPOINT)

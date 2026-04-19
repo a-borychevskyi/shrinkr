@@ -197,13 +197,19 @@ services:
     networks:
       - monitoring
 
+  # Locust runs in distributed mode: one master (UI + stats + Prometheus
+  # endpoint) and N worker processes generating the actual load. Python's
+  # GIL caps a single locust process at ~1 core — at high QPS the client
+  # was CPU-bound on itself, not on the app. Workers spread load across
+  # cores; scale them with:
+  #   docker compose --profile load up -d --scale locust-worker=4
   locust:
     build:
       context: ..
       dockerfile: docker/locust.Dockerfile
     container_name: locust
     profiles: ["load"]
-    command: ["--host", "http://the-app:8000"]
+    command: ["--master", "--host", "http://the-app:8000"]
     ports:
       - "8089:8089"   # Locust web UI
       - "9646:9646"   # Prometheus metrics
@@ -211,6 +217,27 @@ services:
       - the-app
     networks:
       - monitoring
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 1g
+
+  locust-worker:
+    build:
+      context: ..
+      dockerfile: docker/locust.Dockerfile
+    profiles: ["load"]
+    command: ["--worker", "--master-host", "locust"]
+    depends_on:
+      - locust
+    networks:
+      - monitoring
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 1g
 
   postgres:
     image: postgres:18.0-alpine

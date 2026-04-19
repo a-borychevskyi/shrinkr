@@ -16,6 +16,13 @@ exporters:
 
   prometheus:
     endpoint: 0.0.0.0:8889
+    # Resource attributes (service.instance.id, env, role, …) become
+    # Prometheus labels. Without this, all gunicorn workers collapse
+    # into a single time series whose value appears to reset every
+    # time a different worker exports, and rate() reports 10–20× too
+    # low. With it, each worker is its own series and sum() works.
+    resource_to_telemetry_conversion:
+      enabled: true
 
 service:
   pipelines:

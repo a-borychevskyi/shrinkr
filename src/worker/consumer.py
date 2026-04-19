@@ -22,6 +22,8 @@ from typing import Any, Protocol
 
 import structlog
 
+from prometheus_client import Counter, Gauge
+
 from src.kafka.metrics import (
     CLICKS_BATCH_SIZE,
     CLICKS_CONSUMED_TOTAL,
@@ -58,6 +60,7 @@ class ClickConsumer:
         flush_interval_seconds: float,
         poll_timeout_seconds: float = 0.5,
         flush_timeout_seconds: float = 30.0,
+        lag_gauge_min_interval_seconds: float = 5.0,
     ) -> None:
         self._consumer = consumer
         self._repository = repository
@@ -67,6 +70,32 @@ class ClickConsumer:
         self._poll_timeout = poll_timeout_seconds
         self._flush_timeout = flush_timeout_seconds
         self._stop = threading.Event()
+        # Per-partition labeled metrics are cached lazily — partition
+        # assignment is dynamic, but the set is small and stable in
+        # practice. prometheus_client's .labels() re-hashes the label
+        # tuple per call, which showed up at ~7% CPU in profiling.
+        self._consumed_counter_by_partition: dict[int, Counter] = {}
+        self._lag_gauge_by_partition: dict[int, Gauge] = {}
+        # Lag gauge updates call committed()+get_watermark_offsets() per
+        # partition — both are blocking broker RPCs. At ~24 flushes/s × 3
+        # partitions that's ~144 round-trips/s just to update a gauge.
+        # Rate-limit to at most one refresh per this many seconds.
+        self._lag_gauge_min_interval = lag_gauge_min_interval_seconds
+        self._last_lag_update_ts: float = 0.0
+
+    def _get_consumed_counter(self, partition: int) -> Counter:
+        counter = self._consumed_counter_by_partition.get(partition)
+        if counter is None:
+            counter = CLICKS_CONSUMED_TOTAL.labels(partition=str(partition))
+            self._consumed_counter_by_partition[partition] = counter
+        return counter
+
+    def _get_lag_gauge(self, partition: int) -> Gauge:
+        gauge = self._lag_gauge_by_partition.get(partition)
+        if gauge is None:
+            gauge = KAFKA_CONSUMER_LAG.labels(partition=str(partition))
+            self._lag_gauge_by_partition[partition] = gauge
+        return gauge
 
     def stop(self) -> None:
         self._stop.set()
@@ -82,7 +111,7 @@ class ClickConsumer:
             while not self._stop.is_set():
                 msg = self._consumer.poll(timeout=self._poll_timeout)
                 if msg is not None and msg.error() is None:
-                    CLICKS_CONSUMED_TOTAL.labels(partition=str(msg.partition())).inc()
+                    self._get_consumed_counter(msg.partition()).inc()
                     event = self._decode_or_skip(msg)
                     if event is not None:
                         self._batcher.add(event)
@@ -93,7 +122,7 @@ class ClickConsumer:
             # Drain on shutdown.
             if len(self._batcher) > 0:
                 self._submit_flush(loop, self._batcher.drain())
-            self._update_lag_gauge()
+            self._update_lag_gauge(force=True)
             logger.info("click_poll_loop_stopped")
         finally:
             self._consumer.close()
@@ -163,7 +192,14 @@ class ClickConsumer:
             self._consumer.commit(message=msg, asynchronous=False)
             return None
 
-    def _update_lag_gauge(self) -> None:
+    def _update_lag_gauge(self, force: bool = False) -> None:
+        now = perf_counter()
+        if (
+            not force
+            and (now - self._last_lag_update_ts) < self._lag_gauge_min_interval
+        ):
+            return
+        self._last_lag_update_ts = now
         try:
             assignment = self._consumer.assignment()
             if not assignment:
@@ -173,9 +209,7 @@ class ClickConsumer:
                 _, high = self._consumer.get_watermark_offsets(tp, timeout=1.0)
                 # tp.offset == -1001 means no committed offset yet for this partition.
                 committed_offset = tp.offset if tp.offset >= 0 else 0
-                KAFKA_CONSUMER_LAG.labels(partition=str(tp.partition)).set(
-                    max(high - committed_offset, 0)
-                )
+                self._get_lag_gauge(tp.partition).set(max(high - committed_offset, 0))
         except Exception:
             # Lag metric is best-effort; never crash the loop.
             logger.warning("click_lag_metric_update_failed", exc_info=True)
