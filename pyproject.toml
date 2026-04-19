@@ -93,3 +93,7 @@ ignore_missing_imports = true
 [[tool.mypy.overrides]]
 module = "opentelemetry.*"
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "pyroscope.*"
+ignore_missing_imports = true

@@ -18,7 +18,7 @@ from src.config.otel import OtelConfig
 from src.config.profiling import ProfilingConfig
 
 try:
-    import pyroscope  # type: ignore[import-not-found]
+    import pyroscope
 except ImportError:  # pragma: no cover - win32 has no pyroscope-io wheels
     pyroscope = None  # type: ignore[assignment]
 
