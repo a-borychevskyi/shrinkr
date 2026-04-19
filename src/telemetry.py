@@ -1,4 +1,3 @@
-import os
 import socket
 
 import structlog
@@ -14,6 +13,7 @@ from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
+from src.config.app import AppConfig
 from src.config.otel import OtelConfig
 from src.config.profiling import ProfilingConfig
 
@@ -68,8 +68,7 @@ def instrument_app(app):  # noqa: ANN001
     FastAPIInstrumentor.instrument_app(app)
 
 
-def _detect_role() -> str:
-    service_name = os.environ.get("OTEL_SERVICE_NAME", "")
+def _detect_role(service_name: str) -> str:
     if service_name.endswith("-worker"):
         return "worker"
     if service_name:
@@ -87,10 +86,11 @@ def setup_profiling() -> None:
         return
 
     otel_config = OtelConfig()
+    app_config = AppConfig()
     tags = {
-        "env": os.environ.get("APP_ENVIRONMENT", "unknown"),
+        "env": app_config.APP_ENVIRONMENT,
         "instance": socket.gethostname(),
-        "role": _detect_role(),
+        "role": _detect_role(otel_config.OTEL_SERVICE_NAME),
     }
 
     try:

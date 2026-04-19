@@ -2,7 +2,6 @@ from unittest.mock import patch
 
 import pytest
 
-from src.config.profiling import ProfilingConfig
 from src.telemetry import setup_profiling
 
 
@@ -13,7 +12,6 @@ def enabled_config(monkeypatch):
     monkeypatch.setenv("PYROSCOPE_SAMPLE_RATE", "100")
     monkeypatch.setenv("OTEL_SERVICE_NAME", "shrinkr-test")
     monkeypatch.setenv("APP_ENVIRONMENT", "test")
-    return ProfilingConfig(_env_file=None)
 
 
 def test_noop_when_disabled(monkeypatch):
@@ -31,7 +29,7 @@ def test_configures_sdk_when_enabled(enabled_config):
     assert kwargs["application_name"] == "shrinkr-test"
     assert kwargs["server_address"] == "http://pyroscope:4040"
     assert kwargs["sample_rate"] == 100
-    assert kwargs["tags"]["role"] in {"api", "worker", "unknown"}
+    assert kwargs["tags"]["role"] == "api"
     assert kwargs["tags"]["env"] == "test"
     assert "instance" in kwargs["tags"]
 
