@@ -12,14 +12,21 @@ graph LR
     ALB --> App[FastAPI]
     App --> Redis[(Redis)]
     App --> PG[(PostgreSQL)]
-    App -->|OTLP| Collector[OTel Collector]
+    App -->|fire-and-forget| Kafka[(Kafka: clicks)]
+    Kafka --> Worker[ClickConsumer worker]
+    Worker --> PG
+    App -->|OTLP traces+metrics| Collector[OTel Collector]
+    Worker -->|OTLP traces+metrics| Collector
+    App -.->|pprof CPU| Pyroscope[(Pyroscope)]
+    Worker -.->|pprof CPU| Pyroscope
     Collector --> Jaeger
     Collector --> Prometheus
     Prometheus --> Grafana
+    Pyroscope --> Grafana
     Loki --> Grafana
 ```
 
-**Request flow:** Client hits the FastAPI app through a load balancer. Short-link redirects check Redis first (cache hit) and fall back to PostgreSQL on a miss. Click stats are recorded per redirect. All requests are traced end-to-end via OpenTelemetry.
+**Request flow:** Client hits the FastAPI app through a load balancer. Short-link redirects check Redis first (cache hit) and fall back to PostgreSQL on a miss. Every redirect fires a click event into Kafka; a dedicated `ClickConsumer` worker drains the topic and bulk-inserts into Postgres. Traces and metrics flow via OpenTelemetry to Jaeger + Prometheus; CPU profiles from both the API and the worker stream continuously to Grafana Pyroscope.
 
 ### Layers
 
@@ -33,17 +40,19 @@ graph LR
 
 ## Tech Stack
 
-| Component | Technology |
-|-----------|------------|
-| Language | Python 3.12 |
-| Framework | FastAPI (async) |
-| Database | PostgreSQL 18 via SQLAlchemy 2.0 + asyncpg |
-| Cache / Rate Limiting | Redis 7 |
-| Observability | OpenTelemetry, Prometheus, Grafana, Loki, Jaeger |
-| Logging | structlog (JSON in prod, pretty-print in dev) |
-| Containerisation | Docker (multi-stage), Docker Compose |
-| Linting | ruff |
-| Testing | pytest + httpx |
+| Component             | Technology                                                                          |
+|-----------------------|-------------------------------------------------------------------------------------|
+| Language              | Python 3.12                                                                         |
+| Framework             | FastAPI (async)                                                                     |
+| Database              | PostgreSQL 18 via SQLAlchemy 2.0 + asyncpg                                          |
+| Cache / Rate Limiting | Redis 7                                                                             |
+| Streaming             | Apache Kafka (KRaft) + confluent-kafka-python                                       |
+| Tracing + Metrics     | OpenTelemetry → OTel Collector → Jaeger (traces), Prometheus + Grafana (metrics)    |
+| Logs                  | structlog (JSON in prod) → Promtail → Loki → Grafana                                |
+| Profiling             | Grafana Pyroscope (continuous CPU, via `pyroscope-io`) + py-spy (ad-hoc flamegraphs) |
+| Containerisation      | Docker (multi-stage), Docker Compose                                                |
+| Linting               | ruff                                                                                |
+| Testing               | pytest + httpx + testcontainers                                                     |
 
 ## Quick Start
 
@@ -56,14 +65,15 @@ docker compose -f docker/compose.yml up --build
 
 The API is now running at `http://localhost:8000`.
 
-| URL | Service |
-|-----|---------|
-| [localhost:8000/docs](http://localhost:8000/docs) | Swagger UI |
-| [localhost:8000/redoc](http://localhost:8000/redoc) | ReDoc |
-| [localhost:3000](http://localhost:3000) | Grafana (admin/admin) |
-| [localhost:16686](http://localhost:16686) | Jaeger UI |
-| [localhost:9090](http://localhost:9090) | Prometheus |
-| [localhost:5540](http://localhost:5540) | RedisInsight |
+| URL                                                 | Service                                     |
+|-----------------------------------------------------|---------------------------------------------|
+| [localhost:8000/docs](http://localhost:8000/docs)   | Swagger UI                                  |
+| [localhost:8000/redoc](http://localhost:8000/redoc) | ReDoc                                       |
+| [localhost:3000](http://localhost:3000)             | Grafana (admin/admin)                       |
+| [localhost:16686](http://localhost:16686)           | Jaeger UI                                   |
+| [localhost:9090](http://localhost:9090)             | Prometheus                                  |
+| [localhost:4040](http://localhost:4040)             | Pyroscope (continuous-profiling flamegraphs) |
+| [localhost:5540](http://localhost:5540)             | RedisInsight                                |
 
 ## API
 
@@ -183,12 +193,18 @@ Minimum coverage threshold: **70%** (enforced in `pyproject.toml`).
 
 ## Observability
 
-The full monitoring stack runs alongside the app in Docker Compose:
+The full monitoring stack runs alongside the app in Docker Compose. Four signals, each one integrated into Grafana so investigation can start from a single dashboard:
 
 - **Structured logging** — structlog outputs JSON in production and pretty-printed logs in development. Logs are scraped by Promtail and aggregated in Loki.
-- **Distributed tracing** — OpenTelemetry auto-instruments FastAPI, SQLAlchemy, and Redis. Traces are exported via OTLP to Jaeger through the OTel Collector.
-- **Metrics** — Prometheus scrapes application metrics (cache hit/miss rates, DB operation counts, rate-limit rejections). Four pre-built Grafana dashboards ship with the project: application overview, Redis metrics, SQL metrics, and a load-testing dashboard (see *Performance*).
-- **Profiling:** Continuous CPU profiling via Grafana Pyroscope. See [docs/profiling.md](docs/profiling.md).
+- **Distributed tracing** — OpenTelemetry auto-instruments FastAPI, SQLAlchemy, and Redis. Head-based sampling (`OTEL_TRACES_SAMPLER_RATIO`, default 5 %) keeps the export cost bounded at high RPS; traces are exported via OTLP to Jaeger through the OTel Collector.
+- **Metrics** — Prometheus scrapes application metrics (cache hit/miss rates, DB operation counts, rate-limit rejections, Kafka producer/consumer counters, per-partition consumer lag). Pre-built Grafana dashboards ship with the project: application overview, Redis, SQL, Kafka, a load-testing view, and a dedicated profiling view (see below).
+- **Continuous profiling** — Grafana Pyroscope receives pprof-format CPU profiles from the API and the worker every few seconds, tagged with `service_name`, `role` (`api` / `worker`), `env`, and `instance`. The **Shrinkr — Profiling** dashboard shows side-by-side flamegraphs so you can attribute CPU cost to source lines without redeploying. Toggled by `PYROSCOPE_ENABLED`, sample rate via `PYROSCOPE_SAMPLE_RATE`.
+- **Ad-hoc profiling** — py-spy is bundled into the runtime image. For a focused 30-second flamegraph during a spike:
+  ```bash
+  docker exec -it the-app       uv run py-spy record -o /tmp/api.svg    --pid 1 --duration 30
+  docker exec -it shrinkr-worker uv run py-spy record -o /tmp/worker.svg --pid 1 --duration 30
+  ```
+  or `py-spy top --pid 1` for a live `top`-style view. Full runbook: [docs/profiling.md](docs/profiling.md).
 
 ## Performance
 
