@@ -124,3 +124,50 @@ class TestClickConsumer:
         result = click_consumer._decode_or_skip(bad_msg)
         assert result is None
         consumer.commit.assert_called_once_with(message=bad_msg, asynchronous=False)
+
+
+class TestLagGaugeGating:
+    """Lag gauge refreshes involve blocking broker RPCs (committed/
+    get_watermark_offsets) per partition. Under load these add up — they
+    fired on every flush previously. We rate-limit them to avoid burning
+    consumer throughput on metric upkeep.
+    """
+
+    def _build(self, interval: float):
+        consumer = MagicMock()
+        consumer.assignment.return_value = []  # no partitions → cheap no-op body
+        repo = MagicMock()
+        c = ClickConsumer(
+            consumer=consumer,
+            repository=repo,
+            batch_size=2,
+            flush_interval_seconds=10.0,
+            lag_gauge_min_interval_seconds=interval,
+        )
+        return c, consumer
+
+    def test_first_call_always_updates(self):
+        c, consumer = self._build(interval=5.0)
+        c._update_lag_gauge()
+        consumer.assignment.assert_called_once()
+
+    def test_second_call_within_interval_is_skipped(self):
+        c, consumer = self._build(interval=5.0)
+        c._update_lag_gauge()
+        c._update_lag_gauge()
+        # Still just the one call from the first update.
+        assert consumer.assignment.call_count == 1
+
+    def test_call_after_interval_elapses_updates_again(self):
+        c, consumer = self._build(interval=5.0)
+        c._update_lag_gauge()
+        # Simulate 6 s passing by pushing the last-update timestamp back.
+        c._last_lag_update_ts -= 6.0
+        c._update_lag_gauge()
+        assert consumer.assignment.call_count == 2
+
+    def test_force_bypasses_gate(self):
+        c, consumer = self._build(interval=60.0)
+        c._update_lag_gauge()
+        c._update_lag_gauge(force=True)
+        assert consumer.assignment.call_count == 2
