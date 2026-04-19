@@ -196,30 +196,32 @@ The redirect hot path was stress-tested with Locust (see [`load/`](load/)) and i
 
 **Changes, in order applied:**
 
-1. Click tracking off the redirect critical path — synchronous `INSERT` → `BackgroundTask` → in-process batching queue.
-2. Dropped per-query SQL INFO log and per-429 WARN log — blocking stdout writes were stalling the async event loop (app CPU sat at ~1% while p95 was pinned at 240 ms).
-3. Flipped to JSON logs (production mode) and parametrized gunicorn worker count via `WEB_CONCURRENCY`.
+1. Click tracking off the redirect critical path — synchronous `INSERT` on the redirect → `BackgroundTask` → in-process batching queue.
+2. Dropped per-query SQL INFO log and per-429 WARN log — blocking stdout writes were stalling the async event loop (app CPU sat at ~1 % while p95 was pinned at 240 ms).
+3. Flipped to JSON logs in production and parametrised gunicorn worker count via `WEB_CONCURRENCY`.
 4. `@lru_cache` on the async Redis client — request-scoped instantiation was exhausting the kernel's ephemeral-port range under load.
 5. Right-sized the SQLAlchemy pool against Postgres `max_connections` via `DB_POOL_SIZE` / `DB_MAX_OVERFLOW`.
-6. Batched click ingestion — the redirect handler enqueues a `ClickEvent`; a background consumer drains the queue every 100 ms and flushes via a single multi-row `INSERT` per batch, no `RETURNING`.
+6. Click ingestion moved to Kafka — the API's redirect handler fires a `ClickEvent` into librdkafka's non-blocking producer queue; a separate worker process consumes the topic and writes in bulk to Postgres. This decouples click durability from the redirect request and lets ingestion scale independently of API replicas.
 
-**Result — same infrastructure, 250 concurrent users:**
+**Result — 250 concurrent users driven by Locust in distributed mode (1 master + 4 workers), same app/DB/Redis infrastructure:**
 
-| Signal                   | Baseline | Optimized   |
-|--------------------------|----------|-------------|
-| Throughput               | 268 rps  | **1,803 rps** |
-| `GET /{short_code}` p95  | 240 ms   | **87 ms**   |
-| p99 overall              | 386 ms   | **100 ms**  |
-| Postgres CPU at peak     | 97 %     | **13 %**    |
-| Failures                 | 0        | 0           |
+| Signal                                | Baseline         | Current                    |
+|---------------------------------------|------------------|----------------------------|
+| Throughput (aggregate)                | 268 rps          | **2,471 rps**              |
+| `GET /{short_code}` p50 / p95 / p99   | — / 240 / 386 ms | **51 / 180 / 280 ms**      |
+| `POST /v0/shortner/` p50 / p95 / p99  | —                | **42 / 180 / 370 ms**      |
+| Kafka click events ingested by worker | n/a              | **1,639 ev/s**             |
+| Failures                              | 0                | 0                          |
+
+Numbers are end-to-end as observed by the Locust client, which is itself Python and therefore CPU-capped by the GIL — distributed mode (master + workers) spreads load generation across cores so the client isn't the bottleneck.
 
 Reproduce it yourself:
 
 ```bash
-docker compose -f docker/compose.yml --profile load up --build
+docker compose -f docker/compose.yml --profile load up -d --scale locust-worker=4 --build
 ```
 
-Then drive load from the Locust UI at `http://localhost:8089` and watch live RPS and latency on the **Shrinkr / Locust** dashboard in Grafana (`http://localhost:3000`).
+Then drive load from the Locust UI at `http://localhost:8089` and watch live RPS and latency on the **Shrinkr — Locust** dashboard in Grafana (`http://localhost:3000`).
 
 ## Docker
 
@@ -265,6 +267,6 @@ python -m http.server -d docs/_build/html 8080
 - **Authentication** — API key or JWT-based auth for link management.
 - **Terraform** — AWS infrastructure as code (VPC, RDS, ElastiCache, ECS Fargate, ALB).
 - **Kubernetes** — Deployment manifests, Helm chart, HPA autoscaling.
-- **Analytics pipeline** — Kafka for durable, cross-worker click ingestion (current impl is an in-process batched queue per worker) and ClickHouse for analytical queries.
+- **Analytics pipeline** — ClickHouse for analytical queries over the click stream (Kafka ingestion is already in place via the worker).
 - **Geo-distributed caching** — CDN or edge caching for redirect latency.
 - **Custom alias and expiration** — Let users choose their own short codes and set link expiry.
